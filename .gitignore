@@ -1,0 +1,8 @@
+.DS_Store
+*.swp
+*.bak
+.release/
+
+# Dev artifacts — kept locally, not shipped/committed
+image*.png
+*.pen

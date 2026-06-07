@@ -1,0 +1,14 @@
+package-as: GuildRecipeDex
+
+ignore:
+  - .github
+  - .gitignore
+  - .pkgmeta
+  - CLAUDE.md
+  - LICENSE.md
+  - README.md
+  - scripts
+  - "*.psd"
+  - "*.xcf"
+
+manual-changelog: CHANGELOG.md
