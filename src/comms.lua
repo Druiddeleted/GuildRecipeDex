@@ -65,7 +65,7 @@ local function buildHello()
           any = true
         end
         if any then
-          chars[charKey] = { n = c.name, r = c.realm, cl = c.class, p = cp }
+          chars[charKey] = { n = c.name, r = c.realm, cl = c.class, own = c.own or nil, p = cp }
         end
       end
     end
@@ -84,7 +84,7 @@ local function buildData(charKey, skillLineID)
   for rid in pairs(p.recipes or {}) do ids[#ids + 1] = rid end
   return {
     t = "D",
-    ck = charKey, n = c.name, r = c.realm, cl = c.class,
+    ck = charKey, n = c.name, r = c.realm, cl = c.class, own = c.own or nil,
     sid = skillLineID,
     ts = p.scannedAt or 0,
     pn = p.name, rank = p.rank, max = p.maxRank,
@@ -115,6 +115,9 @@ local function handleHello(self, sender, hello)
   local _, _, myCharKey = selfName()
   for charKey, peerChar in pairs(hello.chars) do
     local myChar = db.characters and db.characters[charKey]
+    if peerChar.own and myChar and not myChar.own then
+      myChar.own = true
+    end
     for sid, peerProf in pairs(peerChar.p or {}) do
       local myTs = (myChar and myChar.professions and myChar.professions[sid] and myChar.professions[sid].scannedAt) or 0
       local peerTs = peerProf.ts or 0
@@ -148,6 +151,9 @@ local function handleData(self, sender, data)
   c.name = data.n or c.name
   c.realm = data.r or c.realm
   c.class = data.cl or c.class
+  -- Preserve or adopt the own-alt flag: keep it if already set locally,
+  -- or accept it from the sender (they know their own alts).
+  if c.own or data.own then c.own = true end
   c.professions = c.professions or {}
   local existing = c.professions[data.sid]
   if existing and (existing.scannedAt or 0) >= (data.ts or 0) then return end
