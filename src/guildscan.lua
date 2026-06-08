@@ -151,6 +151,8 @@ local function scanLinkedView()
     local c = GuildRecipeDexDB.characters[key] or {}
     c.name = crafterName
     c.realm = realm
+    local linkGUID = parsePlayerGUIDFromLink(probe.listLink)
+    if linkGUID then c.guid = linkGUID end
     -- Stamp guild context: this person is in our guild (we can only see their
     -- linked profession because they're a guildie).
     local db = GuildRecipeDexDB

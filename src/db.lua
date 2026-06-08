@@ -53,6 +53,7 @@ function ns.DB:GetCharacter()
     self.root.characters[key] = c
   end
   c.own = true  -- distinguishes your own characters (you/alts) from guild members
+  c.guid = UnitGUID and UnitGUID("player") or c.guid
   c.faction = UnitFactionGroup and UnitFactionGroup("player") or nil
   local gn = GetGuildInfo and GetGuildInfo("player")
   c.guildName = gn or nil
@@ -70,22 +71,35 @@ function ns.DB:DiffRoster()
   local myGuild = db.playerGuild
   local myGuildRealm = db.playerGuildRealm
   if not myGuild then return end
-  -- Build current roster set
-  local current = {}
+  local currentNames = {}
+  local guidToName = {}
   local n = GetNumGuildMembers and GetNumGuildMembers() or 0
   for i = 1, n do
-    local fullName = GetGuildRosterInfo and GetGuildRosterInfo(i)
+    local fullName, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, guid = GetGuildRosterInfo and GetGuildRosterInfo(i)
     if fullName then
       local name = fullName:match("^([^%-]+)")
-      if name then current[name:lower()] = true end
+      if name then
+        currentNames[name:lower()] = true
+        if guid and guid ~= "" then guidToName[guid] = name end
+      end
     end
   end
-  -- Clear guildName/guildRealm for non-own chars no longer on roster
-  for _, c in pairs(db.characters or {}) do
+  for key, c in pairs(db.characters or {}) do
     if not c.own and c.guildName == myGuild and c.guildRealm == myGuildRealm then
-      if c.name and not current[c.name:lower()] then
-        c.guildName = nil
-        c.guildRealm = nil
+      if c.name and not currentNames[c.name:lower()] then
+        local newName = c.guid and guidToName[c.guid]
+        if newName then
+          c.name = newName
+        else
+          c.guildName = nil
+          c.guildRealm = nil
+        end
+      end
+    end
+    if c.name and not c.guid then
+      local lname = c.name:lower()
+      for guid, rname in pairs(guidToName) do
+        if rname:lower() == lname then c.guid = guid; break end
       end
     end
   end
