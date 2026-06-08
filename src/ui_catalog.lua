@@ -64,74 +64,6 @@ function P.expansionsForProfession(pid)
   return out
 end
 
--- Build the category tree for an expansion. Data structure: each expansion has
--- exactly one "Patterns" category tagged with skillLine == expansionID. All
--- sub-categories under it have skillLine == baseProfession; recipes (also
--- skillLine == base) attach to those leaf sub-categories by category ID.
-function P.buildExpansionTree(expansionID)
-  local tree = {}
-  local roots = {}
-  if not ns.Catalog or not ns.Catalog.categories or not ns.Catalog.recipes then return tree, roots end
-
-  -- Find the root "Patterns" category for this expansion.
-  local patternsCatID
-  for cid, c in pairs(ns.Catalog.categories) do
-    if c.skillLine == expansionID then patternsCatID = cid; break end
-  end
-  if not patternsCatID then return tree, roots end
-
-  -- Walk DOWN, collecting all descendant categories.
-  local function walk(cid)
-    local c = ns.Catalog.categories[cid]
-    if not c or tree[cid] then return end
-    tree[cid] = { id = cid, name = c.name, parent = c.parent, childCats = {}, recipeIDs = {} }
-    for childID, childCat in pairs(ns.Catalog.categories) do
-      if childCat.parent == cid then walk(childID) end
-    end
-  end
-  walk(patternsCatID)
-
-  -- Wire up child relationships.
-  for cid, c in pairs(tree) do
-    if c.parent and tree[c.parent] then
-      table.insert(tree[c.parent].childCats, cid)
-    end
-  end
-
-  -- Attach recipes whose category is in our tree.
-  for rid, r in pairs(ns.Catalog.recipes) do
-    if tree[r.category] then
-      table.insert(tree[r.category].recipeIDs, rid)
-    end
-  end
-
-  local function nameOf(cid) return tree[cid] and tree[cid].name or "" end
-  for _, c in pairs(tree) do
-    table.sort(c.childCats, function(a, b) return nameOf(a) < nameOf(b) end)
-  end
-
-  -- Subtree recipe totals (direct + descendants) so the UI can hide empty
-  -- sections and show accurate per-section counts.
-  local function countSub(cid)
-    local c = tree[cid]
-    if not c then return 0 end
-    if c._sub ~= nil then return c._sub end
-    c._sub = 0  -- cycle guard
-    local n = #(c.recipeIDs or {})
-    for _, ch in ipairs(c.childCats) do n = n + countSub(ch) end
-    c._sub = n
-    return n
-  end
-  for cid in pairs(tree) do countSub(cid) end
-
-  -- Skip the "Patterns" root entirely: its (now-sorted) child categories are the
-  -- real top-level sections shown in the list.
-  roots = {}
-  local pc = tree[patternsCatID]
-  if pc then for _, c in ipairs(pc.childCats) do roots[#roots + 1] = c end end
-  return tree, roots
-end
-
 -- Precomputed map recipeID -> number of distinct characters who can craft it
 -- (drives the list count pills). Cached; invalidate when scan/sync data changes.
 function P.ensureCrafterCounts()
@@ -160,7 +92,70 @@ end
 
 function P.invalidateCrafterCounts() P._crafterCounts = nil end
 
--- Merge every expansion's tree for a profession into one (the "All" pill).
+function P.buildExpansionTree(expansionID)
+  P._expansionTreeCache = P._expansionTreeCache or {}
+  if P._expansionTreeCache[expansionID] then
+    return P._expansionTreeCache[expansionID].tree, P._expansionTreeCache[expansionID].roots
+  end
+  local tree = {}
+  local roots = {}
+  if not ns.Catalog or not ns.Catalog.categories or not ns.Catalog.recipes then return tree, roots end
+
+  local patternsCatID
+  for cid, c in pairs(ns.Catalog.categories) do
+    if c.skillLine == expansionID then patternsCatID = cid; break end
+  end
+  if not patternsCatID then return tree, roots end
+
+  local function walk(cid)
+    local c = ns.Catalog.categories[cid]
+    if not c or tree[cid] then return end
+    tree[cid] = { id = cid, name = c.name, parent = c.parent, childCats = {}, recipeIDs = {} }
+    for childID, childCat in pairs(ns.Catalog.categories) do
+      if childCat.parent == cid then walk(childID) end
+    end
+  end
+  walk(patternsCatID)
+
+  for cid, c in pairs(tree) do
+    if c.parent and tree[c.parent] then
+      table.insert(tree[c.parent].childCats, cid)
+    end
+  end
+
+  for rid, r in pairs(ns.Catalog.recipes) do
+    if tree[r.category] then
+      table.insert(tree[r.category].recipeIDs, rid)
+    end
+  end
+
+  local function nameOf(cid) return tree[cid] and tree[cid].name or "" end
+  for _, c in pairs(tree) do
+    table.sort(c.childCats, function(a, b) return nameOf(a) < nameOf(b) end)
+  end
+
+  local function countSub(cid)
+    local c = tree[cid]
+    if not c then return 0 end
+    if c._sub ~= nil then return c._sub end
+    c._sub = 0
+    local n = #(c.recipeIDs or {})
+    for _, ch in ipairs(c.childCats) do n = n + countSub(ch) end
+    c._sub = n
+    return n
+  end
+  for cid in pairs(tree) do countSub(cid) end
+
+  roots = {}
+  local pc = tree[patternsCatID]
+  if pc then for _, c in ipairs(pc.childCats) do roots[#roots + 1] = c end end
+
+  P._expansionTreeCache[expansionID] = { tree = tree, roots = roots }
+  return tree, roots
+end
+
+function P.invalidateExpansionTreeCache() P._expansionTreeCache = nil end
+
 function P.buildProfessionTree(pid)
   local mergedTree, mergedRoots = {}, {}
   for _, e in ipairs(P.expansionsForProfession(pid)) do

@@ -328,7 +328,8 @@ function P.selectExpansion(eid)
   else
     P.tree, P.roots = P.buildExpansionTree(eid)
   end
-  for cid in pairs(P.tree) do state.expanded[cid] = true end  -- start fully expanded
+  for cid in pairs(P.tree) do state.expanded[cid] = true end
+  if P.listScroll then P.listScroll:SetVerticalScroll(0) end
   P.refreshExpansionPills()
   P.refreshList(); P.refreshDetail(); P.refreshFooter()
 end
