@@ -175,8 +175,8 @@ local function buildFrame()
   listScroll:SetScrollChild(listChild)
   listScroll:SetScript("OnVerticalScroll", function(self, off)
     self:SetVerticalScroll(off)
-    P.state.scrollOffset = math.floor(off / ROW_HEIGHT + 0.5)
-    P.refreshList()
+    P.state.scrollTop = off
+    if P.renderVisibleRows then P.renderVisibleRows() end
   end)
 
   -- footer (counts · last sync · re-sync) -------------------------------

@@ -5,6 +5,8 @@ local T = ns.UITheme
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local LISTW = 336          -- row width (≈ left-pane scroll width)
 local CAT_H, REC_H = 26, 44 -- category header / recipe row heights
+local VISIBLE_ROWS = 24    -- rows visible in the scroll viewport
+local POOL_SIZE = VISIBLE_ROWS + 4
 
 ----------------------------------------------------------------------
 -- Flat row list (category tree + recipes, or flat search results)
@@ -151,89 +153,107 @@ end
 function P.refreshList()
   local flatRows = flattenRows()
   P.flatRows = flatRows
-  local rows = P.listRows
-  for i = #rows + 1, #flatRows do rows[i] = makeRow() end
+  local offsets = {}
+  local totalH = 0
+  for i, e in ipairs(flatRows) do
+    offsets[i] = totalH
+    totalH = totalH + (e.kind == "cat" and CAT_H or REC_H)
+  end
+  P.rowOffsets = offsets
+  P.totalHeight = totalH
+  P.listChild:SetHeight(math.max(totalH, 1))
+  P.renderVisibleRows()
+end
+
+function P.renderVisibleRows()
+  local flatRows = P.flatRows or {}
+  local offsets  = P.rowOffsets or {}
+  local scrollTop = P.state.scrollTop or 0
+  local viewH = (P.listScroll and P.listScroll:GetHeight()) or (VISIBLE_ROWS * REC_H)
+  local scrollBot = scrollTop + viewH
+
+  local firstIdx = 1
+  for i = 1, #flatRows do
+    if (offsets[i] or 0) + (flatRows[i].kind == "cat" and CAT_H or REC_H) > scrollTop then
+      firstIdx = i; break
+    end
+  end
 
   local counts = P.ensureCrafterCounts()
-  local y = 0
-  for i, row in ipairs(rows) do
+  local rows = P.listRows
+  for i = #rows + 1, POOL_SIZE do rows[i] = makeRow() end
+
+  local slot = 0
+  for i = firstIdx, #flatRows do
+    local rowTop = offsets[i] or 0
+    if rowTop >= scrollBot then break end
+    slot = slot + 1
+    if slot > POOL_SIZE then break end
+    local row = rows[slot]
     local e = flatRows[i]
-    if not e then
-      row:Hide()
+    row:Show()
+    row.entry = e
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", 0, -rowTop)
+
+    if e.kind == "cat" then
+      row:SetHeight(CAT_H)
+      local c = P.tree[e.catID]
+      row.iconFrame:Hide(); row.name:Hide(); row.sub:Hide(); row.countPill:Hide()
+      row.selBg:Hide(); row.selBar:Hide()
+      row.recipeID = nil
+      local chev = P.state.expanded[e.catID] and T.ICON["chevron-down"] or T.ICON["chevron-right"]
+      if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(chev) then row.catChevron:SetAtlas(chev) end
+      row.catChevron:ClearAllPoints(); row.catChevron:SetPoint("LEFT", 10 + e.depth * 10, 0); row.catChevron:Show()
+      row.catLabel:ClearAllPoints(); row.catLabel:SetPoint("LEFT", row.catChevron, "RIGHT", 6, 0)
+      row.catLabel:SetText(string.upper(c and c.name or "?")); row.catLabel:Show()
+      row.catCount:SetText(tostring((c and c._sub) or 0)); row.catCount:Show()
+      row.catLine:ClearAllPoints()
+      row.catLine:SetPoint("LEFT", row.catLabel, "RIGHT", 8, 0)
+      row.catLine:SetPoint("RIGHT", row.catCount, "LEFT", -8, 0)
+      row.catLine:Show()
     else
-      row:Show()
-      row.entry = e
-      row:ClearAllPoints()
-      row:SetPoint("TOPLEFT", 0, -y)
-
-      if e.kind == "cat" then
-        row:SetHeight(CAT_H)
-        local c = P.tree[e.catID]
-        row.iconFrame:Hide(); row.name:Hide(); row.sub:Hide(); row.countPill:Hide()
-        row.selBg:Hide(); row.selBar:Hide()
-        row.recipeID = nil
-
-        local chev = P.state.expanded[e.catID] and T.ICON["chevron-down"] or T.ICON["chevron-right"]
-        if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(chev) then row.catChevron:SetAtlas(chev) end
-        row.catChevron:ClearAllPoints(); row.catChevron:SetPoint("LEFT", 10 + e.depth * 10, 0); row.catChevron:Show()
-        row.catLabel:ClearAllPoints(); row.catLabel:SetPoint("LEFT", row.catChevron, "RIGHT", 6, 0)
-        row.catLabel:SetText(string.upper(c and c.name or "?")); row.catLabel:Show()
-        row.catCount:SetText(tostring((c and c._sub) or 0)); row.catCount:Show()
-        row.catLine:ClearAllPoints()
-        row.catLine:SetPoint("LEFT", row.catLabel, "RIGHT", 8, 0)
-        row.catLine:SetPoint("RIGHT", row.catCount, "LEFT", -8, 0)
-        row.catLine:Show()
-        y = y + CAT_H
+      row:SetHeight(REC_H)
+      row.catChevron:Hide(); row.catLabel:Hide(); row.catCount:Hide(); row.catLine:Hide()
+      row.recipeID = e.recipeID
+      local sel = (P.state.selectedRecipeID == e.recipeID)
+      local name, icon = P.recipeDisplay(e.recipeID)
+      row.iconFrame:ClearAllPoints(); row.iconFrame:SetPoint("LEFT", 8 + e.depth * 10, 0); row.iconFrame:Show()
+      row.icon:SetTexture(icon)
+      row.name:ClearAllPoints()
+      row.name:SetPoint("TOPLEFT", row.iconFrame, "TOPRIGHT", 8, -1)
+      row.name:SetPoint("RIGHT", row, "RIGHT", -44, 0)
+      row.name:SetText(name); row.name:SetTextColor(T.rgba(sel and "gold" or "blue")); row.name:Show()
+      row.sub:ClearAllPoints()
+      row.sub:SetPoint("BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", 8, 1)
+      row.sub:SetPoint("RIGHT", row, "RIGHT", -44, 0)
+      row.sub:SetText(recipeSubtitle(e.recipeID)); row.sub:SetTextColor(T.rgba(sel and "goldDim" or "goldFaint")); row.sub:Show()
+      local n = counts[e.recipeID] or 0
+      row.countText:SetText(tostring(n))
+      row.countPill:SetWidth((row.countText:GetStringWidth() or 8) + 12)
+      if n > 0 then
+        row.countPill:SetBackdropColor(T.rgba("chipOn"))
+        row.countPill:SetBackdropBorderColor(T.rgba("chipBorder"))
+        row.countText:SetTextColor(T.rgba("greenBright"))
       else
-        row:SetHeight(REC_H)
-        row.catChevron:Hide(); row.catLabel:Hide(); row.catCount:Hide(); row.catLine:Hide()
-        row.recipeID = e.recipeID
-        local sel = (P.state.selectedRecipeID == e.recipeID)
-
-        local name, icon = P.recipeDisplay(e.recipeID)
-        row.iconFrame:ClearAllPoints(); row.iconFrame:SetPoint("LEFT", 8 + e.depth * 10, 0); row.iconFrame:Show()
-        row.icon:SetTexture(icon)
-
-        row.name:ClearAllPoints()
-        row.name:SetPoint("TOPLEFT", row.iconFrame, "TOPRIGHT", 8, -1)
-        row.name:SetPoint("RIGHT", row, "RIGHT", -44, 0)
-        row.name:SetText(name); row.name:SetTextColor(T.rgba(sel and "gold" or "blue")); row.name:Show()
-
-        row.sub:ClearAllPoints()
-        row.sub:SetPoint("BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", 8, 1)
-        row.sub:SetPoint("RIGHT", row, "RIGHT", -44, 0)
-        row.sub:SetText(recipeSubtitle(e.recipeID)); row.sub:SetTextColor(T.rgba(sel and "goldDim" or "goldFaint")); row.sub:Show()
-
-        local n = counts[e.recipeID] or 0
-        row.countText:SetText(tostring(n))
-        row.countPill:SetWidth((row.countText:GetStringWidth() or 8) + 12)
-        if n > 0 then
-          row.countPill:SetBackdropColor(T.rgba("chipOn"))
-          row.countPill:SetBackdropBorderColor(T.rgba("chipBorder"))
-          row.countText:SetTextColor(T.rgba("greenBright"))
-        else
-          row.countPill:SetBackdropColor(T.rgba("rowBg"))
-          row.countPill:SetBackdropBorderColor(T.rgba("border"))
-          row.countText:SetTextColor(T.rgba("goldFaint"))
-        end
-        row.countPill:Show()
-
-        if sel then row.selBg:Show(); row.selBar:Show() else row.selBg:Hide(); row.selBar:Hide() end
-
-        -- Warm the output item so the subtitle fills in once cached.
-        local catr = ns.Catalog.recipes[e.recipeID]
-        if catr and catr.item and catr.item ~= 0 and (row.sub:GetText() or "") == "" then
-          local it = Item:CreateFromItemID(catr.item)
-          local rid = e.recipeID
-          it:ContinueOnItemLoad(function()
-            if row.recipeID == rid then row.sub:SetText(recipeSubtitle(rid)) end
-          end)
-        end
-        y = y + REC_H
+        row.countPill:SetBackdropColor(T.rgba("rowBg"))
+        row.countPill:SetBackdropBorderColor(T.rgba("border"))
+        row.countText:SetTextColor(T.rgba("goldFaint"))
+      end
+      row.countPill:Show()
+      if sel then row.selBg:Show(); row.selBar:Show() else row.selBg:Hide(); row.selBar:Hide() end
+      -- Warm the output item so the subtitle fills in once cached.
+      local catr = ns.Catalog.recipes[e.recipeID]
+      if catr and catr.item and catr.item ~= 0 and (row.sub:GetText() or "") == "" then
+        local it = Item:CreateFromItemID(catr.item)
+        local rid = e.recipeID
+        it:ContinueOnItemLoad(function()
+          if row.recipeID == rid then row.sub:SetText(recipeSubtitle(rid)) end
+        end)
       end
     end
   end
-  P.listChild:SetHeight(math.max(y, 1))
+  for i = slot + 1, #rows do rows[i]:Hide() end
 end
 
 ----------------------------------------------------------------------
@@ -322,6 +342,7 @@ function P.selectExpansion(eid)
   state.expansionID = eid
   state.selectedRecipeID = nil
   state.scrollOffset = 0
+  state.scrollTop = 0
   state.expanded = {}
   if eid == "all" then
     P.tree, P.roots = P.buildProfessionTree(state.professionID)
