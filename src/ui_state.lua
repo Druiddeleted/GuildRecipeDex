@@ -17,9 +17,19 @@ ns.UIPriv = {
 
   -- Widget references (assigned by buildFrame in ui.lua).
   frame = nil,
-  profDropdown = nil,
-  expansionDropdown = nil,
+  profName = nil,
+  profIconTex = nil,
   searchBox = nil,
+  searchPlaceholder = nil,
+  profCounts = nil,
+  expPillScroll = nil,
+  expPillChild = nil,
+  footerLeft = nil,
+  footerSync = nil,
+  craftersChild = nil,
+  craftersPill = nil,
+  whisperBtn = nil,
+  whisperLabel = nil,
   listScroll = nil,
   listChild = nil,
   detail = nil,
@@ -38,6 +48,10 @@ ns.UIPriv = {
   -- Pools.
   listRows = {},
   reagentSlots = {},
+  expPills = {},
+  cards = {},
+  crafterRows = {},
+  crafterTabs = {},
   flatRows = {},
 
   -- Category tree for the selected expansion.
@@ -54,7 +68,9 @@ ns.UIPriv = {
     expansionID = nil,     -- selected expansion child skillLineID (e.g. 2915 = Midnight LW)
     search = "",
     selectedRecipeID = nil,
+    selectedCrafter = nil,
     expanded = {},         -- [categoryID] = true
     scrollOffset = 0,
+    crafterFilter = "all", -- all | alts | guild | online
   },
 }

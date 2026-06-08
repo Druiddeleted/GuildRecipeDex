@@ -30,6 +30,7 @@ function ns.DB:GetCharacter()
     c = { name = UnitName("player"), realm = GetRealmName(), class = select(2, UnitClass("player")), professions = {} }
     self.root.characters[key] = c
   end
+  c.own = true  -- distinguishes your own characters (you/alts) from guild members
   return c
 end
 

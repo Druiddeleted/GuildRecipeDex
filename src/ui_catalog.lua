@@ -15,16 +15,31 @@ function P.professionsList()
   return out
 end
 
+-- Expansion skillLine IDs are NOT chronological (the pre-Shadowlands era IDs are
+-- out of sequence), so order by a known era list. Higher = newer.
+local ERA_ORDER = {
+  ["Classic"] = 1, ["Outland"] = 2, ["Northrend"] = 3, ["Cataclysm"] = 4,
+  ["Pandaria"] = 5, ["Draenor"] = 6, ["Legion"] = 7, ["Kul Tiran"] = 8,
+  ["Shadowlands"] = 9, ["Dragon Isles"] = 10, ["Khaz Algar"] = 11, ["Midnight"] = 12,
+}
+
 function P.expansionsForProfession(pid)
   local out = {}
   local prof = ns.Catalog.professions and ns.Catalog.professions[pid]
   if not prof then return out end
+  local profName = prof.name or ""
   for _, eid in ipairs(prof.expansions or {}) do
     local e = ns.Catalog.expansions and ns.Catalog.expansions[eid]
-    if e then table.insert(out, { id = eid, name = e.name, icon = e.icon }) end
+    if e then
+      local era = (e.name:gsub(" " .. profName .. "$", ""))  -- "Midnight Leatherworking" -> "Midnight"
+      table.insert(out, { id = eid, name = e.name, icon = e.icon, era = era, order = ERA_ORDER[era] or 0 })
+    end
   end
-  -- Sort newest expansion first (higher skillLineID is newer).
-  table.sort(out, function(a, b) return a.id > b.id end)
+  -- Newest era first; fall back to id for any unmapped era.
+  table.sort(out, function(a, b)
+    if a.order ~= b.order then return a.order > b.order end
+    return a.id > b.id
+  end)
   return out
 end
 
@@ -69,14 +84,134 @@ function P.buildExpansionTree(expansionID)
     end
   end
 
-  -- The "patterns" category is our visual root.
-  roots = { patternsCatID }
-
   local function nameOf(cid) return tree[cid] and tree[cid].name or "" end
   for _, c in pairs(tree) do
     table.sort(c.childCats, function(a, b) return nameOf(a) < nameOf(b) end)
   end
+
+  -- Subtree recipe totals (direct + descendants) so the UI can hide empty
+  -- sections and show accurate per-section counts.
+  local function countSub(cid)
+    local c = tree[cid]
+    if not c then return 0 end
+    if c._sub ~= nil then return c._sub end
+    c._sub = 0  -- cycle guard
+    local n = #(c.recipeIDs or {})
+    for _, ch in ipairs(c.childCats) do n = n + countSub(ch) end
+    c._sub = n
+    return n
+  end
+  for cid in pairs(tree) do countSub(cid) end
+
+  -- Skip the "Patterns" root entirely: its (now-sorted) child categories are the
+  -- real top-level sections shown in the list.
+  roots = {}
+  local pc = tree[patternsCatID]
+  if pc then for _, c in ipairs(pc.childCats) do roots[#roots + 1] = c end end
   return tree, roots
+end
+
+-- Precomputed map recipeID -> number of distinct characters who can craft it
+-- (drives the list count pills). Cached; invalidate when scan/sync data changes.
+function P.ensureCrafterCounts()
+  if P._crafterCounts then return P._crafterCounts end
+  local counts = {}
+  local db = GuildRecipeDexDB
+  if db and db.characters then
+    for _, char in pairs(db.characters) do
+      local seen = {}
+      if char.professions then
+        for _, prof in pairs(char.professions) do
+          if prof.recipes then
+            for rid in pairs(prof.recipes) do
+              if not seen[rid] then seen[rid] = true; counts[rid] = (counts[rid] or 0) + 1 end
+            end
+          end
+        end
+      end
+    end
+  end
+  P._crafterCounts = counts
+  return counts
+end
+
+function P.invalidateCrafterCounts() P._crafterCounts = nil end
+
+-- Merge every expansion's tree for a profession into one (the "All" pill).
+function P.buildProfessionTree(pid)
+  local mergedTree, mergedRoots = {}, {}
+  for _, e in ipairs(P.expansionsForProfession(pid)) do
+    local t, r = P.buildExpansionTree(e.id)
+    for cid, c in pairs(t) do mergedTree[cid] = c end
+    for _, rc in ipairs(r) do mergedRoots[#mergedRoots + 1] = rc end
+  end
+  return mergedTree, mergedRoots
+end
+
+-- Build (once, cached) a recipe-count-per-expansion index for the pill badges.
+-- catExpansion maps a categoryID up to the expansion skillLine it belongs to.
+function P.ensureExpansionIndex()
+  if P._expRecipeCount then return end
+  local cats = (ns.Catalog and ns.Catalog.categories) or {}
+  local exps = (ns.Catalog and ns.Catalog.expansions) or {}
+  local catExp = {}
+  local function expOf(cid)
+    if catExp[cid] ~= nil then return catExp[cid] end
+    catExp[cid] = false  -- guard against cycles
+    local c = cats[cid]
+    local e = false
+    if c then
+      if exps[c.skillLine] then
+        e = c.skillLine
+      elseif c.parent and c.parent ~= 0 then
+        e = expOf(c.parent)
+      end
+    end
+    catExp[cid] = e
+    return e
+  end
+  for cid in pairs(cats) do expOf(cid) end
+  local counts = {}
+  for _, r in pairs((ns.Catalog and ns.Catalog.recipes) or {}) do
+    local e = catExp[r.category]
+    if e then counts[e] = (counts[e] or 0) + 1 end
+  end
+  P._catExpansion = catExp
+  P._expRecipeCount = counts
+end
+
+function P.expansionRecipeCount(eid)
+  P.ensureExpansionIndex()
+  return P._expRecipeCount[eid] or 0
+end
+
+function P.professionRecipeCount(pid)
+  P.ensureExpansionIndex()
+  local total = 0
+  for _, e in ipairs(P.expansionsForProfession(pid)) do
+    total = total + (P._expRecipeCount[e.id] or 0)
+  end
+  return total
+end
+
+function P.professionCraftableCount(pid)
+  local counts = P.ensureCrafterCounts()
+  local expansions = P.expansionsForProfession(pid)
+  if not expansions or #expansions == 0 then return 0 end
+  local seen = {}
+  local total = 0
+  for _, e in ipairs(expansions) do
+    local t, _ = P.buildExpansionTree(e.id)
+    for _, cat in pairs(t) do
+      for _, rid in ipairs(cat.recipeIDs or {}) do
+        if not seen[rid] and (counts[rid] or 0) > 0 then
+          seen[rid] = true
+          total = total + 1
+        end
+      end
+    end
+  end
+  return total
 end
 
 -- Lookup: for a given recipeID, which characters have it learned?
@@ -94,6 +229,77 @@ function P.craftersForRecipe(recipeID)
       end
     end
   end
+  return out
+end
+
+-- Compact "3h" / "2d" elapsed label.
+function P.shortAgo(secs)
+  if not secs or secs <= 0 then return "" end
+  if secs < 3600 then return math.floor(secs / 60) .. "m" end
+  if secs < 86400 then return math.floor(secs / 3600) .. "h" end
+  return math.floor(secs / 86400) .. "d"
+end
+
+-- Guild roster status, keyed by lowercased "name-realm" and bare "name".
+-- Best-effort: online flag + seconds-since-last-online. Empty if not guilded.
+function P.guildStatus()
+  local map = {}
+  if not (IsInGuild and IsInGuild()) then return map end
+  if C_GuildInfo and C_GuildInfo.GuildRoster then C_GuildInfo.GuildRoster() end
+  local n = (GetNumGuildMembers and GetNumGuildMembers()) or 0
+  for i = 1, n do
+    local fullName, _, _, _, _, _, _, _, online = GetGuildRosterInfo(i)
+    if fullName then
+      local secs = 0
+      if not online and GetGuildRosterLastOnline then
+        local y, m, d, h = GetGuildRosterLastOnline(i)
+        secs = (((((y or 0) * 365) + (m or 0) * 30 + (d or 0)) * 24) + (h or 0)) * 3600
+      end
+      local entry = { online = online, secs = secs }
+      map[fullName:lower()] = entry
+      local short = fullName:match("^([^-]+)")
+      if short and not map[short:lower()] then map[short:lower()] = entry end
+    end
+  end
+  return map
+end
+
+-- Structured crafter list for a recipe: who can make it, with kind (you/alt/
+-- guild), profession skill, and best-effort online status. Sorted you → alts →
+-- guild, online first.
+function P.craftersInfoForRecipe(recipeID)
+  local out = {}
+  local db = GuildRecipeDexDB
+  if not db or not db.characters then return out end
+  local myKey = ns.DB and ns.DB:CharKey()
+  local status = P.guildStatus()
+  for key, char in pairs(db.characters) do
+    local has, skill = false, nil
+    if char.professions then
+      for _, prof in pairs(char.professions) do
+        if prof.recipes and prof.recipes[recipeID] then
+          has = true
+          skill = prof.rank or skill
+        end
+      end
+    end
+    if has then
+      local kind = (key == myKey) and "you" or (char.own and "alt" or "guild")
+      local name, realm = char.name or "?", char.realm or ""
+      local st = status[(name .. "-" .. realm):lower()] or status[name:lower()]
+      local online = (kind == "you") or (st and st.online) or false
+      out[#out + 1] = {
+        key = key, name = name, realm = realm, class = char.class,
+        kind = kind, skill = skill, online = online, secs = (st and st.secs) or 0,
+      }
+    end
+  end
+  local rank = { you = 0, alt = 1, guild = 2 }
+  table.sort(out, function(a, b)
+    if rank[a.kind] ~= rank[b.kind] then return rank[a.kind] < rank[b.kind] end
+    if a.online ~= b.online then return a.online end
+    return a.name < b.name
+  end)
   return out
 end
 

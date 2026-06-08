@@ -19,6 +19,7 @@ src\scanner.lua
 src\guildscan.lua
 src\comms.lua
 src\ui_state.lua
+src\ui_theme.lua
 src\ui_catalog.lua
 src\ui_list.lua
 src\ui_detail.lua
