@@ -151,6 +151,11 @@ local function scanLinkedView()
     local c = GuildRecipeDexDB.characters[key] or {}
     c.name = crafterName
     c.realm = realm
+    -- Stamp guild context: this person is in our guild (we can only see their
+    -- linked profession because they're a guildie).
+    local db = GuildRecipeDexDB
+    c.guildName = (db and db.playerGuild) or c.guildName
+    c.guildRealm = (db and db.playerGuildRealm) or c.guildRealm
     c.professions = c.professions or {}
     c.professions[probe.base.professionID] = {
       name = probe.base.professionName,
