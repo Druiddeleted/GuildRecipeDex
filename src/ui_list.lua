@@ -16,6 +16,7 @@ local function hiddenCat(c)
   if not c then return true end
   if (c._sub or 0) == 0 then return true end
   if c.name and c.name:find("^Appendix") then return true end
+  if c.name and c.name:find("^Recraft") then return true end
   return false
 end
 
@@ -53,7 +54,9 @@ local function flattenRows()
     local sortedRecipes = {}
     for _, rid in ipairs(c.recipeIDs) do
       local name = P.recipeDisplay(rid)
-      table.insert(sortedRecipes, { rid = rid, name = name })
+      if not name:find("^Recipe %d") then
+        table.insert(sortedRecipes, { rid = rid, name = name })
+      end
     end
     table.sort(sortedRecipes, function(a, b) return a.name < b.name end)
     for _, e in ipairs(sortedRecipes) do
