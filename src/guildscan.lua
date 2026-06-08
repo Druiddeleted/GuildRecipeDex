@@ -153,6 +153,18 @@ local function scanLinkedView()
     c.realm = realm
     local linkGUID = parsePlayerGUIDFromLink(probe.listLink)
     if linkGUID then c.guid = linkGUID end
+    if not c.class then
+      local rn = GetNumGuildMembers and GetNumGuildMembers() or 0
+      for i = 1, rn do
+        local rName, _, _, _, _, _, _, _, _, _, rClass = GetGuildRosterInfo(i)
+        if rName then
+          local rShort = rName:match("^([^%-]+)")
+          if rShort and rShort:lower() == crafterName:lower() then
+            c.class = rClass; break
+          end
+        end
+      end
+    end
     -- Stamp guild context: this person is in our guild (we can only see their
     -- linked profession because they're a guildie).
     local db = GuildRecipeDexDB
