@@ -23,6 +23,28 @@ function ns.DB:CharKey()
   return charKey()
 end
 
+function ns.DB:RefreshPlayerContext()
+  local db = self.root
+  -- Connected realms (realm-group). GetAutoCompleteRealms may be nil on some builds.
+  local realms = {}
+  if GetAutoCompleteRealms then
+    for _, r in ipairs(GetAutoCompleteRealms() or {}) do
+      if r and r ~= "" then realms[r] = true end
+    end
+  end
+  local myRealm = GetRealmName and GetRealmName()
+  if myRealm then realms[myRealm] = true end
+  db.connectedRealms = realms
+  -- Faction
+  db.playerFaction = UnitFactionGroup and UnitFactionGroup("player") or nil
+  -- Guild
+  local guildName = GetGuildInfo and GetGuildInfo("player")
+  db.playerGuild = guildName or nil
+  db.playerGuildRealm = guildName and myRealm or nil
+  local P = ns.UIPriv
+  if P and P.invalidateCrafterCounts then P.invalidateCrafterCounts() end
+end
+
 function ns.DB:GetCharacter()
   local key = charKey()
   local c = self.root.characters[key]
@@ -31,10 +53,43 @@ function ns.DB:GetCharacter()
     self.root.characters[key] = c
   end
   c.own = true  -- distinguishes your own characters (you/alts) from guild members
+  c.faction = UnitFactionGroup and UnitFactionGroup("player") or nil
+  local gn = GetGuildInfo and GetGuildInfo("player")
+  c.guildName = gn or nil
+  c.guildRealm = gn and (GetRealmName and GetRealmName()) or nil
   return c
 end
 
 function ns.DB:SetProfession(skillLineID, info)
   local c = self:GetCharacter()
   c.professions[skillLineID] = info
+end
+
+function ns.DB:DiffRoster()
+  local db = self.root
+  local myGuild = db.playerGuild
+  local myGuildRealm = db.playerGuildRealm
+  if not myGuild then return end
+  -- Build current roster set
+  local current = {}
+  local n = GetNumGuildMembers and GetNumGuildMembers() or 0
+  for i = 1, n do
+    local fullName = GetGuildRosterInfo and GetGuildRosterInfo(i)
+    if fullName then
+      local name = fullName:match("^([^%-]+)")
+      if name then current[name:lower()] = true end
+    end
+  end
+  -- Clear guildName/guildRealm for non-own chars no longer on roster
+  for _, c in pairs(db.characters or {}) do
+    if not c.own and c.guildName == myGuild and c.guildRealm == myGuildRealm then
+      if c.name and not current[c.name:lower()] then
+        c.guildName = nil
+        c.guildRealm = nil
+      end
+    end
+  end
+  -- Invalidate crafter counts cache so UI reflects the change
+  local P = ns.UIPriv
+  if P and P.invalidateCrafterCounts then P.invalidateCrafterCounts() end
 end

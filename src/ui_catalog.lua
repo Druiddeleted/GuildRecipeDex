@@ -1,6 +1,27 @@
 local _, ns = ...
 local P = ns.UIPriv
 
+local function crafterEligible(char)
+  local db = GuildRecipeDexDB
+  if not db then return false end
+  local myGuild = db.playerGuild
+  local myGuildRealm = db.playerGuildRealm
+  if char.own then
+    -- Own alts: show if same guild OR (same realm-group AND same faction)
+    local sameGuild = myGuild and char.guildName == myGuild
+                      and char.guildRealm == myGuildRealm
+    if sameGuild then return true end
+    local sameRealm = db.connectedRealms and char.realm
+                      and db.connectedRealms[char.realm]
+    local sameFaction = db.playerFaction and char.faction == db.playerFaction
+    return (sameRealm and sameFaction) and true or false
+  end
+  -- Non-own: show only if currently in the same guild
+  return myGuild ~= nil
+     and char.guildName == myGuild
+     and char.guildRealm == myGuildRealm
+end
+
 ----------------------------------------------------------------------
 -- Catalog accessors + recipe display/link helpers
 ----------------------------------------------------------------------
@@ -119,12 +140,14 @@ function P.ensureCrafterCounts()
   local db = GuildRecipeDexDB
   if db and db.characters then
     for _, char in pairs(db.characters) do
-      local seen = {}
-      if char.professions then
-        for _, prof in pairs(char.professions) do
-          if prof.recipes then
-            for rid in pairs(prof.recipes) do
-              if not seen[rid] then seen[rid] = true; counts[rid] = (counts[rid] or 0) + 1 end
+      if crafterEligible(char) then
+        local seen = {}
+        if char.professions then
+          for _, prof in pairs(char.professions) do
+            if prof.recipes then
+              for rid in pairs(prof.recipes) do
+                if not seen[rid] then seen[rid] = true; counts[rid] = (counts[rid] or 0) + 1 end
+              end
             end
           end
         end
@@ -283,7 +306,7 @@ function P.craftersInfoForRecipe(recipeID)
         end
       end
     end
-    if has then
+    if has and crafterEligible(char) then
       local kind = (key == myKey) and "you" or (char.own and "alt" or "guild")
       local name, realm = char.name or "?", char.realm or ""
       local st = status[(name .. "-" .. realm):lower()] or status[name:lower()]
