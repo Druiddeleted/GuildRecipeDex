@@ -28,8 +28,7 @@ jobs:
       - name: Package & upload
         uses: BigWigsMods/packager@v2
         with:
-          # TODO: replace 0 with the CurseForge project ID once the CF project exists.
-          args: -p 0
+            args: -p 1569342
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
