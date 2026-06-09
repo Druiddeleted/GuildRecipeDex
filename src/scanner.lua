@@ -130,9 +130,9 @@ function ns.Scanner:ScanCurrent()
     db.sources = db.sources or {}
     local newSources = {}
     for _, rid in ipairs(recipeIDs) do
-      if not db.sources[rid] then
-        local ok, txt = pcall(C_TradeSkillUI.GetRecipeSourceText, rid)
-        if ok and txt and txt ~= "" then
+      local ok, txt = pcall(C_TradeSkillUI.GetRecipeSourceText, rid)
+      if ok and txt and txt ~= "" then
+        if db.sources[rid] ~= txt then
           db.sources[rid] = txt
           newSources[rid] = txt
         end
