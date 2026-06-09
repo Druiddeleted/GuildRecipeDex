@@ -37,10 +37,9 @@ function ns.DB:RefreshPlayerContext()
   db.connectedRealms = realms
   -- Faction
   db.playerFaction = UnitFactionGroup and UnitFactionGroup("player") or nil
-  -- Guild
-  local guildName = GetGuildInfo and GetGuildInfo("player")
+  local guildName, _, _, guildHomeRealm = GetGuildInfo and GetGuildInfo("player")
   db.playerGuild = guildName or nil
-  db.playerGuildRealm = guildName and myRealm or nil
+  db.playerGuildRealm = guildName and (guildHomeRealm or myRealm) or nil
   local P = ns.UIPriv
   if P and P.invalidateCrafterCounts then P.invalidateCrafterCounts() end
 end
@@ -55,9 +54,9 @@ function ns.DB:GetCharacter()
   c.own = true  -- distinguishes your own characters (you/alts) from guild members
   c.guid = UnitGUID and UnitGUID("player") or c.guid
   c.faction = UnitFactionGroup and UnitFactionGroup("player") or nil
-  local gn = GetGuildInfo and GetGuildInfo("player")
+  local gn, _, _, gnRealm = GetGuildInfo and GetGuildInfo("player")
   c.guildName = gn or nil
-  c.guildRealm = gn and (GetRealmName and GetRealmName()) or nil
+  c.guildRealm = gn and (gnRealm or (GetRealmName and GetRealmName())) or nil
   return c
 end
 
