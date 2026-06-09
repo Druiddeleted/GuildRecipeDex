@@ -298,8 +298,10 @@ function P.refreshExpansionPills()
       pill:SetBackdropColor(T.rgba("rowBg")); pill:SetBackdropBorderColor(T.rgba("border2"))
       pill.label:SetTextColor(T.rgba("goldDim")); pill.count:SetTextColor(T.rgba("goldFaint"))
     end
-    local w = 9 + (pill.label:GetStringWidth() or 10) + 6 + (pill.count:GetStringWidth() or 6) + 9
-    pill:SetWidth(w)
+    local labelW = pill.label:GetUnboundedStringWidth() or pill.label:GetStringWidth() or 10
+    local countW = pill.count:GetUnboundedStringWidth() or pill.count:GetStringWidth() or 6
+    local w = 9 + labelW + 6 + countW + 9
+    pill:SetWidth(math.max(w, 40))
     pill:ClearAllPoints(); pill:SetPoint("LEFT", x, 0)
     pill:Show()
     x = x + w + 6
