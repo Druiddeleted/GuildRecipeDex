@@ -63,7 +63,7 @@ local function buildHello()
         for sid, p in pairs(c.professions) do
           local count = 0
           for _ in pairs(p.recipes or {}) do count = count + 1 end
-          cp[sid] = { ts = p.scannedAt or 0, c = count }
+          cp[sid] = { ts = p.scannedAt or 0, c = count, sg = p.sourceGuild and true or nil }
           any = true
         end
         if any then
@@ -130,13 +130,16 @@ local function handleHello(self, sender, hello)
       if peerChar.gr and not myChar.guildRealm then myChar.guildRealm = peerChar.gr end
     end
     for sid, peerProf in pairs(peerChar.p or {}) do
-      local myTs = (myChar and myChar.professions and myChar.professions[sid] and myChar.professions[sid].scannedAt) or 0
+      local myProf = myChar and myChar.professions and myChar.professions[sid]
+      local myTs   = (myProf and myProf.scannedAt) or 0
+      local mySG   = myProf and myProf.sourceGuild
       local peerTs = peerProf.ts or 0
-      if peerTs > myTs then
-        -- Peer has fresher data for some character; ask for it.
+      local peerSG = peerProf.sg
+      local myEff   = mySG   and 0 or myTs
+      local peerEff = peerSG and 0 or peerTs
+      if peerEff > myEff then
         ns.Comms:SendWhisper(sender, { t = "R", ck = charKey, sid = sid })
-      elseif myTs > peerTs and charKey == myCharKey then
-        -- We have fresher data for our OWN character; offer it.
+      elseif myEff > peerEff then
         local payload = buildData(charKey, sid)
         if payload then ns.Comms:SendWhisper(sender, payload) end
       end
@@ -184,6 +187,7 @@ local function handleData(self, sender, data)
   if data.gr and not c.guildRealm then c.guildRealm = data.gr end
   c.professions = c.professions or {}
   local existing = c.professions[data.sid]
+  if existing and not existing.sourceGuild and not existing.synced then return end
   if existing and (existing.scannedAt or 0) >= (data.ts or 0) then return end
   local recipes = {}
   for _, rid in ipairs(data.ids or {}) do recipes[rid] = true end
