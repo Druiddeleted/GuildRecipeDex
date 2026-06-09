@@ -182,6 +182,9 @@ local function scanLinkedView()
     }
     GuildRecipeDexDB.characters[key] = c
     debug(("  saved as %s (%s, %d recipes)"):format(key, probe.base.professionName or "?", count))
+    if ns.Comms and ns.Comms.AnnounceChange then
+      ns.Comms:AnnounceChange(key, probe.base.professionID)
+    end
   else
     debug("  no crafter identified — data NOT saved to characters")
   end
