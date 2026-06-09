@@ -5,21 +5,14 @@ local function crafterEligible(char)
   local db = GuildRecipeDexDB
   if not db then return false end
   local myGuild = db.playerGuild
-  local myGuildRealm = db.playerGuildRealm
   if char.own then
-    -- Own alts: show if same guild OR (same realm-group AND same faction)
-    local sameGuild = myGuild and char.guildName == myGuild
-                      and char.guildRealm == myGuildRealm
-    if sameGuild then return true end
+    if myGuild and char.guildName == myGuild then return true end
     local sameRealm = db.connectedRealms and char.realm
                       and db.connectedRealms[char.realm]
     local sameFaction = db.playerFaction and char.faction == db.playerFaction
     return (sameRealm and sameFaction) and true or false
   end
-  -- Non-own: show only if currently in the same guild
-  return myGuild ~= nil
-     and char.guildName == myGuild
-     and char.guildRealm == myGuildRealm
+  return myGuild ~= nil and char.guildName == myGuild
 end
 
 ----------------------------------------------------------------------
