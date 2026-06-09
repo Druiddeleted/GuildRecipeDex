@@ -124,6 +124,24 @@ function ns.Scanner:ScanCurrent()
   if ns.Comms and ns.Comms.AnnounceChange then
     ns.Comms:AnnounceChange(ns.DB:CharKey(), skillLineID)
   end
+
+  if C_TradeSkillUI.GetRecipeSourceText then
+    local db = GuildRecipeDexDB
+    db.sources = db.sources or {}
+    local newSources = {}
+    for _, rid in ipairs(recipeIDs) do
+      if not db.sources[rid] then
+        local ok, txt = pcall(C_TradeSkillUI.GetRecipeSourceText, rid)
+        if ok and txt and txt ~= "" then
+          db.sources[rid] = txt
+          newSources[rid] = txt
+        end
+      end
+    end
+    if ns.Comms and ns.Comms.BroadcastSources and next(newSources) then
+      ns.Comms:BroadcastSources(newSources)
+    end
+  end
 end
 
 function ns.Scanner:LearnRecipe(recipeID)

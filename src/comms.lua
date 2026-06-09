@@ -150,6 +150,20 @@ local function handleReq(self, sender, req)
   if payload then ns.Comms:SendWhisper(sender, payload) end
 end
 
+local function handleSources(self, sender, msg)
+  if not msg.s then return end
+  local db = GuildRecipeDexDB
+  db.sources = db.sources or {}
+  local added = 0
+  for rid, txt in pairs(msg.s) do
+    if not db.sources[rid] and type(txt) == "string" and txt ~= "" then
+      db.sources[rid] = txt
+      added = added + 1
+    end
+  end
+  if added > 0 then debug(("merged %d source texts from %s"):format(added, sender)) end
+end
+
 local function handleData(self, sender, data)
   if not data.ck or not data.sid then return end
   local db = GuildRecipeDexDB
@@ -193,6 +207,7 @@ function ns.Comms:OnReceive(prefix, message, channel, sender)
   if payload.t == "H" then handleHello(self, sender, payload)
   elseif payload.t == "R" then handleReq(self, sender, payload)
   elseif payload.t == "D" then handleData(self, sender, payload)
+  elseif payload.t == "S" then handleSources(self, sender, payload)
   end
 end
 
@@ -204,6 +219,13 @@ function ns.Comms:BroadcastHello()
   if not IsInGuild() then debug("comms: not in guild"); return end
   self:SendGuild(buildHello())
   debug("sent HELLO")
+end
+
+function ns.Comms:BroadcastSources(newSources)
+  if not IsInGuild() then return end
+  if not newSources or not next(newSources) then return end
+  self:SendGuild({ t = "S", s = newSources })
+  debug(("broadcast %d source texts"):format((function() local n=0; for _ in pairs(newSources) do n=n+1 end; return n end)()))
 end
 
 -- Called by Scanner after a successful change to push fresh data.
