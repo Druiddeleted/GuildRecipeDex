@@ -126,10 +126,43 @@ function ns.Scanner:ScanCurrent()
   end
 end
 
+function ns.Scanner:LearnRecipe(recipeID)
+  if not recipeID or recipeID == 0 then return end
+  if not (IsPlayerSpell and IsPlayerSpell(recipeID)) then return end
+  local cat = ns.Catalog and ns.Catalog.recipes and ns.Catalog.recipes[recipeID]
+  if not cat then return end
+  local c = ns.DB:GetCharacter()
+  local skillLineID = cat.skillLine
+  if not skillLineID or skillLineID == 0 then return end
+  c.professions = c.professions or {}
+  local prof = c.professions[skillLineID]
+  if not prof then
+    prof = { name = "Unknown", recipes = {}, scannedAt = time() }
+    c.professions[skillLineID] = prof
+  end
+  if not prof.recipes[recipeID] then
+    prof.recipes[recipeID] = true
+    prof.scannedAt = time()
+    debugPrint(("learned recipe %d in skillLine %d"):format(recipeID, skillLineID))
+    if ns.Comms and ns.Comms.AnnounceChange then
+      ns.Comms:AnnounceChange(ns.DB:CharKey(), skillLineID)
+    end
+    local P = ns.UIPriv
+    if P and P.invalidateCrafterCounts then P.invalidateCrafterCounts() end
+    if P and P.refreshList then P.refreshList() end
+    if P and P.refreshDetail then P.refreshDetail() end
+  end
+end
+
 function ns.Scanner:Init()
   local f = CreateFrame("Frame", "GuildRecipeDexScanner")
   for _, ev in ipairs(SCAN_EVENTS) do f:RegisterEvent(ev) end
-  f:SetScript("OnEvent", function() ns.Scanner:ScanCurrent() end)
+  f:SetScript("OnEvent", function(_, event, arg1)
+    if event == "NEW_RECIPE_LEARNED" then
+      ns.Scanner:LearnRecipe(arg1)
+    end
+    ns.Scanner:ScanCurrent()
+  end)
   self.frame = f
   C_Timer.After(1, function() ns.Scanner:ScanCurrent() end)
 end
