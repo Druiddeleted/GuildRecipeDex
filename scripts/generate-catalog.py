@@ -62,6 +62,8 @@ def main():
     spell_effects_rows = fetch_csv("SpellEffect")
     crafting_data_rows = fetch_csv("CraftingData")
     spell_reagents_rows = fetch_csv("SpellReagents")
+    item_effect_rows = fetch_csv("ItemEffect")
+    item_x_item_effect_rows = fetch_csv("ItemXItemEffect")
 
     # Modern (DF+) Modified Crafting reagent tables.
     mcss_rows = fetch_csv("ModifiedCraftingSpellSlot")
@@ -143,6 +145,8 @@ def main():
         if not spell or not slot_id:
             continue
         rtype = slot_to_type.get(slot_id)
+        if rtype is None:
+            continue
         if rtype == 0 and (slot_to_flags.get(slot_id, 0) & SLOT_FLAG_REQUIRED):
             bucket_name = "required"  # Spark: mandatory despite Modifying type
         else:
@@ -186,6 +190,27 @@ def main():
         item = to_int(r.get("CraftedItemID"))
         if cid and item:
             crafting_to_item[cid] = item
+
+    # Build spell -> source itemID map via ItemEffect + ItemXItemEffect.
+    # ItemEffect.SpellID is the spell taught; ItemXItemEffect links ItemEffect
+    # rows to the item (scroll/book) that teaches it. Keep the lowest itemID
+    # per spell (quality 1 base item when multiple quality tiers exist).
+    effect_to_spell = {}
+    for r in item_effect_rows:
+        eid = to_int(r.get("ID"))
+        spell = to_int(r.get("SpellID"))
+        if eid and spell:
+            effect_to_spell[eid] = spell
+
+    spell_to_source_item = {}
+    for r in item_x_item_effect_rows:
+        eid = to_int(r.get("ItemEffectID"))
+        item = to_int(r.get("ItemID"))
+        spell = effect_to_spell.get(eid)
+        if spell and item:
+            existing = spell_to_source_item.get(spell)
+            if existing is None or item < existing:
+                spell_to_source_item[spell] = item
 
     # Build spell -> output itemID map from SpellEffect.
     # Effect 24  = classic create-item, EffectItemType is itemID directly.
@@ -354,7 +379,9 @@ def main():
             mod = emit_slot_list(rg["modifying"])
             fin = emit_slot_list(rg["finishing"])
             # Omit empty buckets to save space.
+            src = spell_to_source_item.get(rid, 0)
             parts = [f"skillLine={r['skillLine']}", f"category={r['category']}", f"item={r['item']}"]
+            if src: parts.append(f"src={src}")
             reagent_parts = []
             if req != "{}": reagent_parts.append(f"required={req}")
             if mod != "{}": reagent_parts.append(f"modifying={mod}")

@@ -257,12 +257,31 @@ local function layoutReagents(buckets, sourceInfo)
   for _, s in ipairs(buckets.finishing) do optional[#optional + 1] = s end
   reagentCard("OPTIONAL REAGENTS", "puzzle", optional, (#optional .. " slots"))
 
-  -- Source (free-text, shown when unlearned).
   if sourceInfo and (sourceInfo.unlearned or sourceInfo.text) then
     local body = (sourceInfo.text and sourceInfo.text ~= "") and sourceInfo.text
       or "Source unknown — open this profession in-game to fetch it."
-    textCard("SOURCE", sourceIconFor(sourceInfo.text),
-      sourceInfo.unlearned and "Not learned" or nil, "red", P.sourceText, body, nil)
+    if sourceInfo.srcItem then
+      ci = ci + 1
+      local card = getCard(ci)
+      card:ClearAllPoints(); card:SetPoint("TOPLEFT", content, "TOPLEFT", 2, -y); card:SetWidth(CARDW)
+      setHeaderIcon(card.hicon, sourceIconFor(sourceInfo.text), "gold")
+      card.htitle:SetText("SOURCE")
+      card.hmeta:SetText(sourceInfo.unlearned and "Not learned" or ""); card.hmeta:SetTextColor(T.rgba("red"))
+      local cy = HEADER
+      local s = nextSlot(); s:SetParent(card)
+      s:ClearAllPoints(); s:SetPoint("TOPLEFT", card, "TOPLEFT", PADX, -cy); s:SetSize(CARDW - PADX * 2, ROWH)
+      fillSlot(s, sourceInfo.srcItem, { required = 0 })
+      cy = cy + ROWH + 4
+      P.sourceText:SetParent(card); P.sourceText:ClearAllPoints()
+      P.sourceText:SetPoint("TOPLEFT", card, "TOPLEFT", PADX, -cy); P.sourceText:SetWidth(CARDW - PADX * 2)
+      P.sourceText:SetText(body); P.sourceText:Show()
+      cy = cy + math.max(P.sourceText:GetStringHeight() or 14, 14) + 10
+      card:SetHeight(cy); card:Show()
+      y = y + cy + 12
+    else
+      textCard("SOURCE", sourceIconFor(sourceInfo.text),
+        sourceInfo.unlearned and "Not learned" or nil, "red", P.sourceText, body, nil)
+    end
   else
     P.sourceText:Hide()
   end
@@ -368,8 +387,9 @@ function P.refreshDetail()
 
   local unlearned = not P.currentCharKnows(state.selectedRecipeID)
   local sourceText = unlearned and P.recipeSourceText(state.selectedRecipeID) or nil
+  local srcItem = catRecipe and (catRecipe.src or 0) ~= 0 and catRecipe.src or nil
 
-  layoutReagents(buckets, { unlearned = unlearned, text = sourceText })
+  layoutReagents(buckets, { unlearned = unlearned, text = sourceText, srcItem = srcItem })
   P.refreshCrafters()
 end
 
