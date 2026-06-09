@@ -7,6 +7,7 @@ ns.frame:RegisterEvent("PLAYER_GUILD_UPDATE")
 ns.frame:RegisterEvent("GUILD_ROSTER_UPDATE")
 
 local rosterTimer = nil
+local lastKnownGuild = nil
 
 ns.frame:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == addonName then
@@ -14,6 +15,7 @@ ns.frame:SetScript("OnEvent", function(_, event, arg1)
 
   elseif event == "PLAYER_LOGIN" then
     ns.DB:RefreshPlayerContext()
+    lastKnownGuild = GuildRecipeDexDB and GuildRecipeDexDB.playerGuild
     ns.Scanner:Init()
     ns.GuildScan:Init()
     ns.Comms:Init()
@@ -22,15 +24,17 @@ ns.frame:SetScript("OnEvent", function(_, event, arg1)
 
   elseif event == "PLAYER_GUILD_UPDATE" then
     ns.DB:RefreshPlayerContext()
-    -- Stamp the current character's guild fields
     if ns.DB.root then ns.DB:GetCharacter() end
-    -- If we just joined a guild, broadcast after a short delay so roster loads first
-    if IsInGuild and IsInGuild() then
-      C_Timer.After(5, function()
-        if ns.Comms and ns.Comms.BroadcastHello and IsInGuild() then
-          ns.Comms:BroadcastHello()
-        end
-      end)
+    local newGuild = GuildRecipeDexDB and GuildRecipeDexDB.playerGuild
+    if newGuild ~= lastKnownGuild then
+      lastKnownGuild = newGuild
+      if IsInGuild and IsInGuild() then
+        C_Timer.After(5, function()
+          if ns.Comms and ns.Comms.BroadcastHello and IsInGuild() then
+            ns.Comms:BroadcastHello()
+          end
+        end)
+      end
     end
 
   elseif event == "GUILD_ROSTER_UPDATE" then
