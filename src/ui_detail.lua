@@ -390,7 +390,7 @@ function P.refreshDetail()
   end
 
   local unlearned = not P.currentCharKnows(state.selectedRecipeID)
-  local sourceText = unlearned and P.recipeSourceText(state.selectedRecipeID) or nil
+  local sourceText = P.recipeSourceText(state.selectedRecipeID)
   local srcItem = (catRecipe and catRecipe.src and catRecipe.src ~= 0) and catRecipe.src or nil
 
   layoutReagents(buckets, { unlearned = unlearned, text = sourceText, srcItem = srcItem })
