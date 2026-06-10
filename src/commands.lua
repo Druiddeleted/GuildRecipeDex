@@ -52,14 +52,26 @@ function ns.Commands:Register()
       local itemID = tonumber(arg)
       if not itemID then print_("usage: /grd item <itemID>"); return end
       local name, link, quality, ilvl, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(itemID)
+      local function dumpItem(id)
+        local n, _, q, il, _, _, _, _, _, _, _, _, _, bt = GetItemInfo(id)
+        print_(("[%d] %s  quality=%s ilvl=%s bindType=%s"):format(id, n or "?", tostring(q), tostring(il), tostring(bt)))
+        if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+          local td = C_TooltipInfo.GetItemByID(id)
+          if td and td.lines then
+            for i, line in ipairs(td.lines) do
+              local t = line.leftText
+              if t and t ~= "" then
+                print_(("  tooltip[%d]: %s"):format(i, t))
+              end
+            end
+          end
+        end
+      end
       if name then
-        print_(("[%d] %s  quality=%s ilvl=%s bindType=%s"):format(itemID, name, tostring(quality), tostring(ilvl), tostring(bindType)))
+        dumpItem(itemID)
       else
         local item = Item:CreateFromItemID(itemID)
-        item:ContinueOnItemLoad(function()
-          local n, l, q, il, _, _, _, _, _, _, _, _, _, bt = GetItemInfo(itemID)
-          print_(("[%d] %s  quality=%s ilvl=%s bindType=%s"):format(itemID, n or "?", tostring(q), tostring(il), tostring(bt)))
-        end)
+        item:ContinueOnItemLoad(function() dumpItem(itemID) end)
         print_(("item %d not cached yet — requesting from server..."):format(itemID))
       end
     elseif input:match("^test ") then
