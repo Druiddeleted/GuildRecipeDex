@@ -323,6 +323,10 @@ function P.refreshDetail()
       local rid = state.selectedRecipeID
       local it = Item:CreateFromItemID(outputItem)
       it:ContinueOnItemLoad(function()
+        if GuildRecipeDexDB and GuildRecipeDexDB.settings and GuildRecipeDexDB.settings.debug then
+          local _, _, q2, _, _, _, _, _, _, _, _, _, _, bt2 = GetItemInfo(outputItem)
+          DEFAULT_CHAT_FRAME:AddMessage("|cff7ec0eeGRD|r item load callback item=" .. outputItem .. " quality=" .. tostring(q2) .. " bindType=" .. tostring(bt2))
+        end
         if P.state.selectedRecipeID == rid then P.refreshDetail() end
       end)
     else
