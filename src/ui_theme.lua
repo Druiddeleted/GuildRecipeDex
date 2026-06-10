@@ -67,13 +67,21 @@ end
 -- renders.
 
 local FONT_DIR = "Interface\\AddOns\\GuildRecipeDex\\Assets\\Fonts\\"
+local FALLBACK_UI   = "Fonts\\FRIZQT__.TTF"
+local FALLBACK_MONO = "Fonts\\ARIALN.TTF"
 
--- Per-file: a bundled .ttf if present in Assets/Fonts, else a WoW built-in
--- fallback so the UI always renders. GeistMono.ttf is bundled; Inter.ttf is not
--- yet (UI text falls back to Friz Quadrata until it's added).
+local function fontPath(file, fallback)
+  local path = FONT_DIR .. file
+  local probe = CreateFont("GRDProbe_" .. file)
+  if probe and not pcall(probe.SetFont, probe, path, 12) then
+    return fallback
+  end
+  return path
+end
+
 T.fontFile = {
-  ui   = FONT_DIR .. "Inter.ttf",          -- bundled
-  mono = FONT_DIR .. "GeistMono.ttf",      -- bundled
+  ui   = fontPath("Inter.ttf",    FALLBACK_UI),
+  mono = fontPath("GeistMono.ttf", FALLBACK_MONO),
 }
 
 ----------------------------------------------------------------------
@@ -175,7 +183,10 @@ end
 function T.Text(parent, opts)
   opts = opts or {}
   local fs = parent:CreateFontString(nil, "OVERLAY")
-  fs:SetFont(opts.mono and T.fontFile.mono or T.fontFile.ui, opts.size or 12, "")
+  local font = opts.mono and T.fontFile.mono or T.fontFile.ui
+  if not pcall(fs.SetFont, fs, font, opts.size or 12, "") then
+    fs:SetFont(opts.mono and FALLBACK_MONO or FALLBACK_UI, opts.size or 12, "")
+  end
   fs:SetTextColor(T.rgba(opts.color or "text"))
   if opts.text then fs:SetText(opts.text) end
   if opts.justify then fs:SetJustifyH(opts.justify) end

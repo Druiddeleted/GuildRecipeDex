@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Fix: font files (Inter.ttf, GeistMono.ttf) were missing from the release package, causing a Lua error on load that prevented `/grd` from registering
+- Fix: `T.Text()` now falls back to WoW built-in fonts if the bundled font file fails to load, so the addon always initializes even if Assets/Fonts is missing
+
 ## 0.1.0
 
 - Virtual scroll for the recipe list — no frame count limit, smooth performance on "All" expansion with 2000+ recipes
