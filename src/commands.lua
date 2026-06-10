@@ -47,6 +47,21 @@ function ns.Commands:Register()
         end
       end
       if n == 0 then print_("no peer data yet (need at least one other guildie running the addon)") end
+    elseif input:match("^item ") then
+      local arg = input:match("^item (.+)")
+      local itemID = tonumber(arg)
+      if not itemID then print_("usage: /grd item <itemID>"); return end
+      local name, link, quality, ilvl, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(itemID)
+      if name then
+        print_(("[%d] %s  quality=%s ilvl=%s bindType=%s"):format(itemID, name, tostring(quality), tostring(ilvl), tostring(bindType)))
+      else
+        local item = Item:CreateFromItemID(itemID)
+        item:ContinueOnItemLoad(function()
+          local n, l, q, il, _, _, _, _, _, _, _, _, _, bt = GetItemInfo(itemID)
+          print_(("[%d] %s  quality=%s ilvl=%s bindType=%s"):format(itemID, n or "?", tostring(q), tostring(il), tostring(bt)))
+        end)
+        print_(("item %d not cached yet — requesting from server..."):format(itemID))
+      end
     elseif input:match("^test ") then
       local arg = input:match("^test (.+)")
       if not arg then print_("usage: /grd test <recipeID or partial name>"); return end
