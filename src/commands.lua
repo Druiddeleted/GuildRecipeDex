@@ -57,14 +57,18 @@ function ns.Commands:Register()
         print_(("[%d] %s  quality=%s ilvl=%s bindType=%s"):format(id, n or "?", tostring(q), tostring(il), tostring(bt)))
         if C_TooltipInfo and C_TooltipInfo.GetItemByID then
           local td = C_TooltipInfo.GetItemByID(id)
-          if td and td.lines then
+          if not td then
+            print_("  C_TooltipInfo.GetItemByID returned nil")
+          elseif not td.lines then
+            print_("  C_TooltipInfo.GetItemByID returned no lines")
+          else
+            print_(("  %d tooltip lines"):format(#td.lines))
             for i, line in ipairs(td.lines) do
-              local t = line.leftText
-              if t and t ~= "" then
-                print_(("  tooltip[%d]: %s"):format(i, t))
-              end
+              print_(("  [%d] leftText=%s bonding=%s"):format(i, tostring(line.leftText), tostring(line.bonding)))
             end
           end
+        else
+          print_("  C_TooltipInfo.GetItemByID not available")
         end
       end
       if name then
