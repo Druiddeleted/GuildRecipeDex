@@ -339,6 +339,9 @@ function P.refreshDetail()
           end
         end
       end
+      if GuildRecipeDexDB and GuildRecipeDexDB.settings and GuildRecipeDexDB.settings.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff7ec0eeGRD|r badge debug item=" .. outputItem .. " bindType=" .. tostring(bindType) .. " tooltipBonding=" .. tostring(tooltipBonding))
+      end
       local isWarbound = tooltipBonding == 1 or tooltipBonding == 5
       local isWuE      = tooltipBonding == 9 or tooltipBonding == 10
       local isBoP      = tooltipBonding == 6 or (not tooltipBonding and bindType == 1)
