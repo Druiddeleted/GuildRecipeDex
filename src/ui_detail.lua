@@ -319,46 +319,41 @@ function P.refreshDetail()
   local badges = {}
   if outputItem and outputItem ~= 0 then
     local _, _, quality, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(outputItem)
-    if not quality then
-      local rid = state.selectedRecipeID
-      local it = Item:CreateFromItemID(outputItem)
-      it:ContinueOnItemLoad(function()
-        if GuildRecipeDexDB and GuildRecipeDexDB.settings and GuildRecipeDexDB.settings.debug then
-          local _, _, q2, _, _, _, _, _, _, _, _, _, _, bt2 = GetItemInfo(outputItem)
-          DEFAULT_CHAT_FRAME:AddMessage("|cff7ec0eeGRD|r item load callback item=" .. outputItem .. " quality=" .. tostring(q2) .. " bindType=" .. tostring(bt2))
-        end
-        if P.state.selectedRecipeID == rid then P.refreshDetail() end
-      end)
-    else
+
+    if quality then
       if quality >= 3 then
         local qualNames = { [3]="Rare", [4]="Epic", [5]="Legendary" }
         badges[#badges+1] = { text = qualNames[quality] or "Rare", color = quality >= 4 and "purple" or "blue" }
       end
-      local tooltipBonding
-      if C_TooltipInfo and C_TooltipInfo.GetItemByID then
-        local td = C_TooltipInfo.GetItemByID(outputItem)
-        if td and td.lines then
-          for _, line in ipairs(td.lines) do
-            if line.bonding then tooltipBonding = line.bonding; break end
-          end
+    else
+      local rid = state.selectedRecipeID
+      local it = Item:CreateFromItemID(outputItem)
+      it:ContinueOnItemLoad(function()
+        if P.state.selectedRecipeID == rid then P.refreshDetail() end
+      end)
+    end
+
+    local tooltipBonding
+    if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+      local td = C_TooltipInfo.GetItemByID(outputItem)
+      if td and td.lines then
+        for _, line in ipairs(td.lines) do
+          if line.bonding then tooltipBonding = line.bonding; break end
         end
       end
-      if GuildRecipeDexDB and GuildRecipeDexDB.settings and GuildRecipeDexDB.settings.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff7ec0eeGRD|r badge debug item=" .. outputItem .. " bindType=" .. tostring(bindType) .. " tooltipBonding=" .. tostring(tooltipBonding))
-      end
-      local isWarbound = tooltipBonding == 1 or tooltipBonding == 5
-      local isWuE      = tooltipBonding == 9 or tooltipBonding == 10
-      local isBoP      = tooltipBonding == 6 or (not tooltipBonding and bindType == 1)
-      local isBoE      = tooltipBonding == 7 or (not tooltipBonding and bindType == 2)
-      if isWarbound then
-        badges[#badges+1] = { text = "Warbound", color = "blue" }
-      elseif isWuE then
-        badges[#badges+1] = { text = "WuE", color = "blue" }
-      elseif isBoP then
-        badges[#badges+1] = { text = "BoP", color = "red" }
-      elseif isBoE then
-        badges[#badges+1] = { text = "BoE", color = "greenBright" }
-      end
+    end
+    local isWarbound = tooltipBonding == 1 or tooltipBonding == 5
+    local isWuE      = tooltipBonding == 9 or tooltipBonding == 10
+    local isBoP      = tooltipBonding == 6 or (not tooltipBonding and bindType == 1)
+    local isBoE      = tooltipBonding == 7 or (not tooltipBonding and bindType == 2)
+    if isWarbound then
+      badges[#badges+1] = { text = "Warbound", color = "blue" }
+    elseif isWuE then
+      badges[#badges+1] = { text = "WuE", color = "blue" }
+    elseif isBoP then
+      badges[#badges+1] = { text = "BoP", color = "red" }
+    elseif isBoE then
+      badges[#badges+1] = { text = "BoE", color = "greenBright" }
     end
   end
   -- Apply to P.headerBadges chips
