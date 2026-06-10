@@ -264,9 +264,20 @@ local function makePill()
   local p = CreateFrame("Button", nil, P.expPillChild, "BackdropTemplate")
   p:SetHeight(24)
   p:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
-  p.label = T.Text(p, { size = 11, color = "goldDim" }); p.label:SetPoint("LEFT", 9, 0)
-  p.count = T.Text(p, { size = 10, color = "goldFaint", mono = true }); p.count:SetPoint("LEFT", p.label, "RIGHT", 6, 0)
+  p.label = T.Text(p, { size = 11, color = "goldDim" })
+  p.label:SetPoint("LEFT", 9, 0)
+  p.label:SetPoint("RIGHT", -9, 0)
+  p.count = T.Text(p, { size = 10, color = "goldFaint", mono = true })
+  p.count:SetPoint("RIGHT", -9, 0)
   p:SetScript("OnClick", function(self) if self.eid ~= nil then P.selectExpansion(self.eid) end end)
+  p:SetScript("OnSizeChanged", function(self)
+    local lw = self.label:GetUnboundedStringWidth() or 0
+    local cw = self.count:GetUnboundedStringWidth() or 0
+    local needed = 9 + lw + 6 + cw + 9
+    if math.abs((self:GetWidth() or 0) - needed) > 1 then
+      self:SetWidth(math.max(needed, 40))
+    end
+  end)
   return p
 end
 
@@ -298,13 +309,24 @@ function P.refreshExpansionPills()
       pill:SetBackdropColor(T.rgba("rowBg")); pill:SetBackdropBorderColor(T.rgba("border2"))
       pill.label:SetTextColor(T.rgba("goldDim")); pill.count:SetTextColor(T.rgba("goldFaint"))
     end
-    local labelW = pill.label:GetUnboundedStringWidth() or pill.label:GetStringWidth() or 10
-    local countW = pill.count:GetUnboundedStringWidth() or pill.count:GetStringWidth() or 6
-    local w = 9 + labelW + 6 + countW + 9
-    pill:SetWidth(math.max(w, 40))
+    local labelW = pill.label:GetUnboundedStringWidth() or 10
+    local countW = pill.count:GetUnboundedStringWidth() or 6
+    local w = math.max(9 + labelW + 6 + countW + 9, 40)
+    pill:SetWidth(w)
     pill:ClearAllPoints(); pill:SetPoint("LEFT", x, 0)
     pill:Show()
     x = x + w + 6
+    local capturedPill = pill
+    C_Timer.After(0, function()
+      if not capturedPill:IsShown() then return end
+      local lw2 = capturedPill.label:GetUnboundedStringWidth() or 0
+      local cw2 = capturedPill.count:GetUnboundedStringWidth() or 0
+      local w2 = math.max(9 + lw2 + 6 + cw2 + 9, 40)
+      if math.abs(capturedPill:GetWidth() - w2) > 1 then
+        capturedPill:SetWidth(w2)
+        P.refreshExpansionPills()
+      end
+    end)
   end
   for i = #entries + 1, #pills do pills[i]:Hide() end
   child:SetWidth(math.max(x, 1)); child:SetHeight(26)
