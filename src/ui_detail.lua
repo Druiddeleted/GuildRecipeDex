@@ -314,24 +314,36 @@ function P.refreshDetail()
   P.detailIcon:SetTexture(icon); P.detailIcon:Show()
   P.detailName:SetText(name)
 
-  -- Badge chips: Rare quality, iLvl, BoP
   local catRecipe = ns.Catalog and ns.Catalog.recipes and ns.Catalog.recipes[state.selectedRecipeID]
   local outputItem = catRecipe and catRecipe.item
   local badges = {}
   if outputItem and outputItem ~= 0 then
     local _, _, quality, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(outputItem)
-    if quality and quality >= 3 then  -- Rare(3), Epic(4), Legendary(5)
+    if quality and quality >= 3 then
       local qualNames = { [3]="Rare", [4]="Epic", [5]="Legendary" }
       badges[#badges+1] = { text = qualNames[quality] or "Rare", color = quality >= 4 and "purple" or "blue" }
     end
-    if bindType == 1 then
-      badges[#badges+1] = { text = "BoP", color = "goldFaint" }
-    elseif bindType == 8 then
-      badges[#badges+1] = { text = "Warbound", color = "goldFaint" }
-    elseif bindType == 9 then
-      badges[#badges+1] = { text = "WuE", color = "goldFaint" }
-    elseif bindType == 2 then
-      badges[#badges+1] = { text = "BoE", color = "goldFaint" }
+    local tooltipBonding
+    if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+      local td = C_TooltipInfo.GetItemByID(outputItem)
+      if td and td.lines then
+        for _, line in ipairs(td.lines) do
+          if line.bonding then tooltipBonding = line.bonding; break end
+        end
+      end
+    end
+    local isWarbound = tooltipBonding == 1 or tooltipBonding == 5
+    local isWuE      = tooltipBonding == 9 or tooltipBonding == 10
+    local isBoP      = tooltipBonding == 6 or (not tooltipBonding and bindType == 1)
+    local isBoE      = tooltipBonding == 7 or (not tooltipBonding and bindType == 2)
+    if isWarbound then
+      badges[#badges+1] = { text = "Warbound", color = "blue" }
+    elseif isWuE then
+      badges[#badges+1] = { text = "WuE", color = "blue" }
+    elseif isBoP then
+      badges[#badges+1] = { text = "BoP", color = "red" }
+    elseif isBoE then
+      badges[#badges+1] = { text = "BoE", color = "greenBright" }
     end
   end
   -- Apply to P.headerBadges chips
