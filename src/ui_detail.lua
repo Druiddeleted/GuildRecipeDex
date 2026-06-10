@@ -319,13 +319,10 @@ function P.refreshDetail()
   local outputItem = catRecipe and catRecipe.item
   local badges = {}
   if outputItem and outputItem ~= 0 then
-    local _, _, quality, ilvl, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(outputItem)
+    local _, _, quality, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(outputItem)
     if quality and quality >= 3 then  -- Rare(3), Epic(4), Legendary(5)
       local qualNames = { [3]="Rare", [4]="Epic", [5]="Legendary" }
       badges[#badges+1] = { text = qualNames[quality] or "Rare", color = quality >= 4 and "purple" or "blue" }
-    end
-    if ilvl and ilvl > 0 then
-      badges[#badges+1] = { text = "iLvl "..ilvl, color = "goldFaint" }
     end
     if bindType == 1 then
       badges[#badges+1] = { text = "BoP", color = "goldFaint" }
