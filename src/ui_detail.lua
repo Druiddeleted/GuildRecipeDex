@@ -326,6 +326,12 @@ function P.refreshDetail()
     end
     if bindType == 1 then
       badges[#badges+1] = { text = "BoP", color = "goldFaint" }
+    elseif bindType == 8 then
+      badges[#badges+1] = { text = "Warbound", color = "goldFaint" }
+    elseif bindType == 9 then
+      badges[#badges+1] = { text = "WuE", color = "goldFaint" }
+    elseif bindType == 2 then
+      badges[#badges+1] = { text = "BoE", color = "goldFaint" }
     end
   end
   -- Apply to P.headerBadges chips
