@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3
+
+- Performance: stored data is dramatically smaller. Full profession scans now persist only the set of known recipe IDs instead of duplicating each recipe's name/icon/category/reagents/output — all of which already live in the bundled catalog. A one-time migration compacts existing SavedVariables on load (a large guild DB shrank from ~56 MB to ~4 MB with no loss of information).
+- New: `/grd errors` opens an on-demand diagnostics popup (color-coded, timestamped, selectable text) backed by an in-memory ring buffer. Errors and comms events are captured silently — no more chat spam.
+- New: `/grd export` dumps the session's diagnostics as shareable plain text (pre-selected for Ctrl+C) and writes them to the `GuildRecipeDexLog` SavedVariable.
+- New: uncaught Lua errors originating in this addon are captured automatically (with stack) for later review.
+- Comms: decode failures now report which stage failed (`channel` / `decompress` / `deserialize`) so foreign traffic, corruption, and version mismatches are distinguishable. Added a protocol-version stamp; version-skew between peers is reported once per peer instead of on every message.
+
 ## 0.1.2
 
 - Fix: recipe header binding badges (Warbound / Warbound-until-equipped / BoP / BoE) now render for recipes whose crafted-output item isn't baked into the catalog (~29% of recipes, e.g. the Voidlight Potion Cauldron). The output item is resolved at runtime via `C_TradeSkillUI.GetRecipeOutputItemData` when the catalog has none, so binding detection can run.

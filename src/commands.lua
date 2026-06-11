@@ -17,6 +17,12 @@ function ns.Commands:Register()
       GuildRecipeDexDB.settings.debug = true; print_("debug ON")
     elseif input == "debug off" then
       GuildRecipeDexDB.settings.debug = false; print_("debug OFF")
+    elseif input == "errors" or input == "diag" then
+      ns.Debug:Toggle()
+    elseif input == "errors clear" then
+      ns.Debug:Clear(); print_("diagnostics cleared")
+    elseif input == "export" or input == "errors export" then
+      ns.Debug:Export()
     elseif input == "dump" then
       local c = ns.DB:GetCharacter()
       local n = 0
@@ -119,7 +125,7 @@ function ns.Commands:Register()
         end
       end
     else
-      print_("commands: show, dump, sync, peers, debug on|off, test <recipeID>")
+      print_("commands: show, dump, sync, peers, debug on|off, errors (popup), export (shareable log), test <recipeID>, item <itemID>")
     end
   end
 end

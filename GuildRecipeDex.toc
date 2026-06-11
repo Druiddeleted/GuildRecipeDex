@@ -2,8 +2,8 @@
 ## Title: GuildRecipeDex
 ## Notes: Catalog-first guild profession browser. See every recipe and who in your guild can craft it.
 ## Author: Druiddeleted
-## Version: 0.1.2
-## SavedVariables: GuildRecipeDexDB
+## Version: 0.1.3
+## SavedVariables: GuildRecipeDexDB, GuildRecipeDexLog
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
@@ -12,6 +12,7 @@ Libs\AceComm-3.0\AceComm-3.0.lua
 Libs\LibSerialize\LibSerialize.lua
 Libs\LibDeflate\LibDeflate.lua
 
+src\debug.lua
 src\core.lua
 src\db.lua
 data\catalog.lua

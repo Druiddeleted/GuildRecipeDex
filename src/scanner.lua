@@ -17,60 +17,6 @@ end
 
 local lastFingerprint = {}
 
--- Extract reagent slots from a recipe schematic, grouped by type.
--- Returns { required = {...}, modifying = {...}, finishing = {...} } where each
--- slot is { qty, options = { {itemID, qty}, ... } }. Most basic slots have one
--- option (the required reagent); quality-tiered or modifying slots have several.
-local function extractReagents(schematic)
-  local out = { required = {}, modifying = {}, finishing = {} }
-  if not schematic or not schematic.reagentSlotSchematics then return out end
-  for _, slot in ipairs(schematic.reagentSlotSchematics) do
-    -- Enum.CraftingReagentType: 0=Modifying, 1=Basic, 2=Finishing, 3=Automatic.
-    local bucket
-    if slot.reagentType == 0 then bucket = out.modifying
-    elseif slot.reagentType == 1 then bucket = out.required
-    elseif slot.reagentType == 2 then bucket = out.finishing
-    end
-    if bucket and slot.reagents and slot.reagents[1] then
-      local options = {}
-      for _, r in ipairs(slot.reagents) do
-        if r.itemID then table.insert(options, r.itemID) end
-      end
-      if #options > 0 then
-        table.insert(bucket, { qty = slot.quantityRequired or 1, options = options, slotInfo = slot.slotInfo })
-      end
-    end
-  end
-  return out
-end
-
--- Walk UP from each known recipe's categoryID to build the full category tree.
--- More reliable than C_TradeSkillUI.GetCategories which has API quirks across patches.
-local function snapshotCategories(recipeIDs)
-  local tree = {}
-  local triedCount, gotCount = 0, 0
-  local function record(catID)
-    if not catID or catID == 0 or tree[catID] then return end
-    triedCount = triedCount + 1
-    local info = C_TradeSkillUI.GetCategoryInfo(catID)
-    if not info or (not info.name and not info.parentCategoryID) then return end
-    gotCount = gotCount + 1
-    tree[catID] = {
-      name = info.name or ("Category " .. catID),
-      parentCategoryID = info.parentCategoryID,
-    }
-    if info.parentCategoryID and info.parentCategoryID ~= 0 then
-      record(info.parentCategoryID)
-    end
-  end
-  for _, rid in ipairs(recipeIDs or {}) do
-    local r = C_TradeSkillUI.GetRecipeInfo(rid)
-    if r and r.categoryID then record(r.categoryID) end
-  end
-  debugPrint(("categories: %d/%d resolved"):format(gotCount, triedCount))
-  return tree
-end
-
 function ns.Scanner:ScanCurrent()
   if not C_TradeSkillUI then return end
   local base = C_TradeSkillUI.GetBaseProfessionInfo and C_TradeSkillUI.GetBaseProfessionInfo()
@@ -89,14 +35,11 @@ function ns.Scanner:ScanCurrent()
   for _, rid in ipairs(recipeIDs) do
     local r = C_TradeSkillUI.GetRecipeInfo(rid)
     if r and r.learned then
-      local schematic = C_TradeSkillUI.GetRecipeSchematic and C_TradeSkillUI.GetRecipeSchematic(rid, false)
-      known[rid] = {
-        name = r.name,
-        icon = r.icon,
-        categoryID = r.categoryID,
-        outputItemID = (schematic and schematic.outputItemID) or nil,
-        reagents = extractReagents(schematic),
-      }
+      -- Store only the known-recipe ID set. Name/icon/category/reagents/output
+      -- all live in the baked catalog (ns.Catalog.recipes[rid]); duplicating them
+      -- per character bloated SavedVariables ~10x. The UI reads details from the
+      -- catalog by ID, and only the keys of this table are ever consumed.
+      known[rid] = true
       fingerprintIDs[#fingerprintIDs + 1] = rid
     end
   end
@@ -115,7 +58,6 @@ function ns.Scanner:ScanCurrent()
     rank = info.skillLevel or (base and base.skillLevel),
     maxRank = info.maxSkillLevel or (base and base.maxSkillLevel),
     recipes = known,
-    categories = snapshotCategories(fingerprintIDs),
     scannedAt = time(),
   })
 

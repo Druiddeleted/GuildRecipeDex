@@ -11,7 +11,32 @@ function ns.DB:Init()
   -- [recipeID] = source text from C_TradeSkillUI.GetRecipeSourceText, cached so
   -- it survives after the relevant profession window is closed.
   db.sources = db.sources or {}
+  self:Compact()
   self.root = db
+end
+
+-- One-time SavedVariables compaction. Older builds stored the full recipe
+-- definition per character (name/icon/categoryID/outputItemID/reagents) plus a
+-- per-profession category snapshot — all redundant with the baked catalog, which
+-- the UI reads from by ID. Only the set of known recipe IDs is needed. This
+-- collapses rich recipe values to `true` and drops the category snapshots,
+-- reclaiming the bulk of a bloated DB on the next logout/reload save.
+function ns.DB:Compact()
+  local db = GuildRecipeDexDB
+  local recipesSlimmed, catsDropped = 0, 0
+  for _, c in pairs(db.characters or {}) do
+    for _, p in pairs(c.professions or {}) do
+      if p.categories ~= nil then p.categories = nil; catsDropped = catsDropped + 1 end
+      if type(p.recipes) == "table" then
+        for rid, v in pairs(p.recipes) do
+          if v ~= true then p.recipes[rid] = true; recipesSlimmed = recipesSlimmed + 1 end
+        end
+      end
+    end
+  end
+  if (recipesSlimmed > 0 or catsDropped > 0) and ns.Debug then
+    ns.Debug:Log("db", ("compacted: %d recipe entries slimmed, %d category snapshots dropped"):format(recipesSlimmed, catsDropped))
+  end
 end
 
 local function charKey()

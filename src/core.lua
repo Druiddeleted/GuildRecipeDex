@@ -9,7 +9,7 @@ ns.frame:RegisterEvent("GUILD_ROSTER_UPDATE")
 local rosterTimer = nil
 local lastKnownGuild = nil
 
-ns.frame:SetScript("OnEvent", function(_, event, arg1)
+local function onEvent(event, arg1)
   if event == "ADDON_LOADED" and arg1 == addonName then
     ns.DB:Init()
 
@@ -45,4 +45,8 @@ ns.frame:SetScript("OnEvent", function(_, event, arg1)
       ns.DB:DiffRoster()
     end)
   end
+end
+
+ns.frame:SetScript("OnEvent", function(_, event, arg1)
+  ns.Debug:Safe("event:" .. tostring(event), onEvent, event, arg1)
 end)

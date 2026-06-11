@@ -3,14 +3,11 @@ local _, ns = ...
 ns.Comms = {}
 
 local PREFIX = "GRD"
+local PROTO = 1   -- wire protocol version; bump when the payload shape changes
 
 local AceComm, LibSerialize, LibDeflate
 
-local function debug(msg)
-  if GuildRecipeDexDB and GuildRecipeDexDB.settings and GuildRecipeDexDB.settings.debug then
-    DEFAULT_CHAT_FRAME:AddMessage("|cff7ec0eeGRD|r " .. msg)
-  end
-end
+local function debug(msg) ns.Debug:Log("comms", msg) end
 
 local function selfName()
   local n, r = UnitFullName("player")
@@ -35,13 +32,19 @@ local function encode(t)
   return LibDeflate:EncodeForWoWAddonChannel(c)
 end
 
+-- Returns the decoded table, or (nil, stage) naming which step failed so a
+-- decode error actually tells us something:
+--   "channel"     bytes aren't WoW-addon-channel safe → foreign/garbled traffic
+--   "decompress"  not valid deflate → different compression / corruption
+--   "deserialize" valid deflate but not a readable LibSerialize stream →
+--                 incompatible LibSerialize version between peers
 local function decode(s)
   local c = LibDeflate:DecodeForWoWAddonChannel(s)
-  if not c then return nil end
+  if not c then return nil, "channel" end
   local raw = LibDeflate:DecompressDeflate(c)
-  if not raw then return nil end
+  if not raw then return nil, "decompress" end
   local ok, t = LibSerialize:Deserialize(raw)
-  if not ok then return nil end
+  if not ok then return nil, "deserialize" end
   return t
 end
 
@@ -106,10 +109,12 @@ end
 
 function ns.Comms:SendGuild(payload)
   if not IsInGuild() then return end
+  payload.v = PROTO
   self:SendCommMessage(PREFIX, encode(payload), "GUILD")
 end
 
 function ns.Comms:SendWhisper(target, payload)
+  payload.v = PROTO
   self:SendCommMessage(PREFIX, encode(payload), "WHISPER", target)
 end
 
@@ -206,13 +211,32 @@ end
 function ns.Comms:OnReceive(prefix, message, channel, sender)
   if prefix ~= PREFIX then return end
   if senderIsMe(sender) then return end
-  local payload = decode(message)
-  if not payload then debug("comms: decode failed from " .. tostring(sender)); return end
-  if payload.t == "H" then handleHello(self, sender, payload)
-  elseif payload.t == "R" then handleReq(self, sender, payload)
-  elseif payload.t == "D" then handleData(self, sender, payload)
-  elseif payload.t == "S" then handleSources(self, sender, payload)
+  local payload, stage = decode(message)
+  if not payload then
+    -- The stage tells us the cause: "channel" = foreign/garbled traffic on the
+    -- short "GRD" prefix; "deserialize" = a peer on an incompatible LibSerialize
+    -- (i.e. an out-of-date addon build); "decompress" = corruption/truncation.
+    ns.Debug:Warn("comms", ("decode failed from %s — %d bytes on %s — stage=%s")
+      :format(tostring(sender), #(message or ""), tostring(channel), tostring(stage)))
+    return
   end
+  if payload.v ~= PROTO then
+    -- Benign (their messages still decode) and repetitive, so warn once per peer.
+    self._skewWarned = self._skewWarned or {}
+    if not self._skewWarned[sender] then
+      self._skewWarned[sender] = true
+      ns.Debug:Warn("comms", ("version skew from %s: their proto=%s, ours=%d (handling anyway)")
+        :format(tostring(sender), tostring(payload.v), PROTO))
+    end
+  end
+  ns.Debug:Safe("comms:" .. tostring(payload.t), function()
+    if payload.t == "H" then handleHello(self, sender, payload)
+    elseif payload.t == "R" then handleReq(self, sender, payload)
+    elseif payload.t == "D" then handleData(self, sender, payload)
+    elseif payload.t == "S" then handleSources(self, sender, payload)
+    else ns.Debug:Warn("comms", ("unknown payload type %q from %s"):format(tostring(payload.t), tostring(sender)))
+    end
+  end)
 end
 
 ----------------------------------------------------------------------
@@ -244,7 +268,7 @@ function ns.Comms:Init()
   LibSerialize = LibStub("LibSerialize", true)
   LibDeflate = LibStub("LibDeflate", true)
   if not AceComm or not LibSerialize or not LibDeflate then
-    DEFAULT_CHAT_FRAME:AddMessage("|cff7ec0eeGRD|r comms: missing libs, sync disabled")
+    ns.Debug:Error("comms", "missing libs (AceComm/LibSerialize/LibDeflate), sync disabled")
     return
   end
   C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
