@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Fix: recipe header binding badges (Warbound / Warbound-until-equipped / BoP / BoE) now render for recipes whose crafted-output item isn't baked into the catalog (~29% of recipes, e.g. the Voidlight Potion Cauldron). The output item is resolved at runtime via `C_TradeSkillUI.GetRecipeOutputItemData` when the catalog has none, so binding detection can run.
+- Fix: binding classification now also recognizes Soulbound and Bind-on-Use tooltip states
+
 ## 0.1.1
 
 - Fix: font files (Inter.ttf, GeistMono.ttf) were missing from the release package, causing a Lua error on load that prevented `/grd` from registering

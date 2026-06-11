@@ -15,6 +15,31 @@ local ROWH = 34             -- reagent row height
 -- bags + character bank + reagent bank + Warband (account) bank.
 local function owned(itemID) return (GetItemCount and GetItemCount(itemID, true, false, true, true)) or 0 end
 
+-- The baked catalog stores the crafted-output itemID per recipe, but ~29% of
+-- recipes (e.g. the Voidlight Potion Cauldron) have item=0 because the output
+-- isn't derivable from the DB2 SpellEffect join the generator uses. Without an
+-- itemID we can't read the output item's quality/binding, so the header badges
+-- (Rare/Epic, BoP/BoE, Warbound) never render. Fall back to the live trade-skill
+-- API, which knows the output item for any recipe the client has data for, and
+-- cache successful resolutions so we only ask once per recipe.
+function P.resolveOutputItem(recipeID)
+  P._outItemCache = P._outItemCache or {}
+  local cached = P._outItemCache[recipeID]
+  if cached then return cached end
+  local id
+  if C_TradeSkillUI and C_TradeSkillUI.GetRecipeOutputItemData then
+    local ok, data = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID)
+    if ok and data and data.itemID and data.itemID ~= 0 then id = data.itemID end
+  end
+  if not id and C_TradeSkillUI and C_TradeSkillUI.GetRecipeItemLink then
+    local link = C_TradeSkillUI.GetRecipeItemLink(recipeID)
+    local lid = link and tonumber(link:match("item:(%d+)"))
+    if lid and lid ~= 0 then id = lid end
+  end
+  if id then P._outItemCache[recipeID] = id end  -- never cache nil: retry once the profession loads
+  return id
+end
+
 local function currencyQty(id)
   local i = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(id)
   return (i and i.quantity) or 0
@@ -316,6 +341,9 @@ function P.refreshDetail()
 
   local catRecipe = ns.Catalog and ns.Catalog.recipes and ns.Catalog.recipes[state.selectedRecipeID]
   local outputItem = catRecipe and catRecipe.item
+  if not outputItem or outputItem == 0 then
+    outputItem = P.resolveOutputItem(state.selectedRecipeID)
+  end
   local badges = {}
   if outputItem and outputItem ~= 0 then
     local _, _, quality, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(outputItem)
@@ -342,10 +370,16 @@ function P.refreshDetail()
         end
       end
     end
+    -- tooltipBonding uses Enum.TooltipDataItemBinding (NOT Enum.ItemBind):
+    --   1 Account / 5 BindToBnetAccount  = "Binds to Warband"
+    --   9 AccountUntilEquipped / 10 BindToAccountUntilEquipped = Warbound until equipped
+    --   3 Soulbound / 6 BindOnPickup = BoP   7 BindOnEquip / 8 BindOnUse = BoE
+    -- bindType (from GetItemInfo) is the legacy fallback when the tooltip line is
+    -- absent: 1 = on pickup, 2 = on equip.
     local isWarbound = tooltipBonding == 1 or tooltipBonding == 5
     local isWuE      = tooltipBonding == 9 or tooltipBonding == 10
-    local isBoP      = tooltipBonding == 6 or (not tooltipBonding and bindType == 1)
-    local isBoE      = tooltipBonding == 7 or (not tooltipBonding and bindType == 2)
+    local isBoP      = tooltipBonding == 3 or tooltipBonding == 6 or (not tooltipBonding and bindType == 1)
+    local isBoE      = tooltipBonding == 7 or tooltipBonding == 8 or (not tooltipBonding and bindType == 2)
     if isWarbound then
       badges[#badges+1] = { text = "Warbound", color = "blue" }
     elseif isWuE then

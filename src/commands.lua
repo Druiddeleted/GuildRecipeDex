@@ -105,6 +105,18 @@ function ns.Commands:Register()
           print_(("    GetItemInfoInstant(%d): id=%s icon=%s"):format(cat.item, tostring(id), tostring(icon)))
         end
         print_(("    spell iconID=%s"):format(si and tostring(si.iconID) or "nil"))
+        -- Resolve the badge's output item (catalog, else runtime) and report binding.
+        local out = (cat.item and cat.item ~= 0 and cat.item)
+          or (ns.UIPriv.resolveOutputItem and ns.UIPriv.resolveOutputItem(rid))
+        print_(("    badge output item = %s"):format(tostring(out)))
+        if out and C_TooltipInfo and C_TooltipInfo.GetItemByID then
+          local td = C_TooltipInfo.GetItemByID(out)
+          local b
+          if td and td.lines then
+            for _, line in ipairs(td.lines) do if line.bonding then b = line.bonding; break end end
+          end
+          print_(("    tooltip bonding = %s  (1/5=Warbound, 9/10=WuE, 3/6=BoP, 7/8=BoE)"):format(tostring(b)))
+        end
       end
     else
       print_("commands: show, dump, sync, peers, debug on|off, test <recipeID>")
