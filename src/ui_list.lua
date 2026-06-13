@@ -33,8 +33,7 @@ local function flattenRows()
     local matches = {}
     for rid, r in pairs(ns.Catalog.recipes) do
       if tree[r.category] and not hiddenCat(tree[r.category]) then
-        local info = P.scannedRecipeInfo(rid)
-        local name = info and info.name
+        local name = P.recipeName(rid)
         if name and name:lower():find(s, 1, true) then
           table.insert(matches, { rid = rid, name = name })
         end

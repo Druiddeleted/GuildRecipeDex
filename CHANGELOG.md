@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- Fix: recipe search returned no results (regression from 0.1.3's storage compaction). Search now resolves recipe names from the client spell DB instead of the removed per-character stored name. Searching e.g. "Bloom" finds "Bloomforged Greataxe" again.
+- Performance: recipe rows no longer scan the entire character database to render a name (removed a dead lookup left over from the compaction).
+
 ## 0.1.3
 
 - Performance: stored data is dramatically smaller. Full profession scans now persist only the set of known recipe IDs instead of duplicating each recipe's name/icon/category/reagents/output — all of which already live in the bundled catalog. A one-time migration compacts existing SavedVariables on load (a large guild DB shrank from ~56 MB to ~4 MB with no loss of information).

@@ -314,22 +314,6 @@ function P.craftersInfoForRecipe(recipeID)
   return out
 end
 
--- Lookup: get the scanned info for a recipe from any character that has it
--- (used to display reagents/icon since the catalog doesn't include those).
-function P.scannedRecipeInfo(recipeID)
-  local db = GuildRecipeDexDB
-  if not db or not db.characters then return nil end
-  for _, char in pairs(db.characters) do
-    if char.professions then
-      for _, prof in pairs(char.professions) do
-        local r = prof.recipes and prof.recipes[recipeID]
-        if type(r) == "table" then return r end
-      end
-    end
-  end
-  return nil
-end
-
 -- Does the player's CURRENT character know this recipe? (drives the
 -- "Recipe Unlearned" indicator). Uses our own scan data, so it's reliable
 -- regardless of whether a profession window is open.
@@ -388,9 +372,7 @@ function P.tryInsertRecipeLink(recipeID)
 end
 
 function P.recipeDisplay(rid)
-  local info = P.scannedRecipeInfo(rid)
-  local name = info and info.name
-  local icon
+  local name, icon
   -- Prefer the OUTPUT item's icon over the spell's icon (which is often the
   -- generic profession icon for unlearned recipes).
   local cat = ns.Catalog and ns.Catalog.recipes and ns.Catalog.recipes[rid]
@@ -398,13 +380,19 @@ function P.recipeDisplay(rid)
     local _, _, _, _, itemIcon = GetItemInfoInstant(cat.item)
     icon = itemIcon
   end
-  if not icon then icon = info and info.icon end
-  if not name then
-    local spellInfo = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rid)
-    if spellInfo then
-      name = spellInfo.name or name
-      if not icon then icon = spellInfo.iconID end
-    end
+  local spellInfo = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rid)
+  if spellInfo then
+    name = spellInfo.name
+    if not icon then icon = spellInfo.iconID end
   end
-  return name or ("Recipe " .. rid), icon or 134400, info
+  return name or ("Recipe " .. rid), icon or 134400, nil
+end
+
+-- Resolve just a recipe's display name. The baked catalog stores no names (kept
+-- slim), so names come from the client spell DB at runtime via C_Spell. Returns
+-- nil when the name isn't available yet, so search can skip unresolved entries
+-- instead of matching a "Recipe <id>" placeholder.
+function P.recipeName(rid)
+  local si = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(rid)
+  return si and si.name or nil
 end
